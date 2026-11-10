@@ -428,7 +428,7 @@ document.addEventListener("change", async e=>{
 });
 
 /* ---------- sincronización con Google Drive (cola offline) ---------- */
-const URL_SCRIPT_DEF = "https://script.google.com/macros/s/AKfycbxkN5PPimOl4ySmoNuph31wpIRlonV06Y4xzy3YnqvxaJr0zINGZSCNeyD7TPUeciDC/exec";   // URL /exec del Apps Script (también se puede pegar en la pestaña Registros)
+const URL_SCRIPT_DEF = "https://script.google.com/macros/s/AKfycbzK0Wy3jhVMH-AWAlj8frfdUBYp5ApQ3CRA_OmEq8vdSP3YQAme5xLQaE4QGhWmAp9u/exec";   // URL /exec del Apps Script (también se puede pegar en la pestaña Registros)
 const KCOLA = KEY+"_cola", KURL = KEY+"_url", KDEV = KEY+"_dispositivo", KULT = KEY+"_ultimo";
 const ls = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
 let COLA = []; try{ COLA = JSON.parse(ls.get(KCOLA)||"[]"); }catch(e){}
