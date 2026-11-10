@@ -1,4 +1,4 @@
-# Verificación Mantención · Renta Maq (Teck Carmen de Andacollo)
+# Liderazgo Visible · Renta Maq (Teck Carmen de Andacollo)
 
 Formulario de verificación en terreno (Plan de Shock). Funciona sin señal y se instala en el celular como app.
 
