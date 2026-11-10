@@ -651,7 +651,7 @@ $("#btnLimpiar").onclick=()=>{ if(confirm("¿Limpiar todas las respuestas y evid
 
 /* ---------- pestañas ---------- */
 /* Clave de la pestaña Registros (solo administrador). Se guarda como huella SHA-256, no la clave en texto. */
-const PIN_HASH = "35df7e5bbbc61eeb23a476804b00edbe9e45bfb6251058cae9497fef02469019";
+const PIN_HASH = "6dbefadceac90cc5297dfe20b30a947d5078735710263b64d0d9db3ef98c2805";
 const ss = { get(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ sessionStorage.setItem(k,v); }catch(e){} } };
 let ADMIN = ss.get(KEY+"_admin")==="1";
 async function sha256(txt){ const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
