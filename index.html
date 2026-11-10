@@ -118,6 +118,8 @@
   .sync.ok .dot{background:#4CAF50} .sync.pend .dot{background:var(--naranjo)} .sync.off .dot{background:#E53935} .sync.run .dot{background:#FFC107;animation:pl 1s infinite}
   @keyframes pl{50%{opacity:.3}}
   .estado-sync{font-size:13.5px;margin:8px 0}
+  .enl{white-space:nowrap;display:inline-block;margin:6px 6px 0 0;font-size:12.5px;font-weight:600;color:var(--naranjo-osc);text-decoration:none;border:1px solid var(--naranjo);border-radius:12px;padding:1px 9px}
+  .actualiz{font-size:12.5px;color:var(--gris-2);margin:-4px 0 10px}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
 </style>
 </head>
@@ -135,7 +137,7 @@
   <div class="tabs">
     <button class="tab activa" data-vista="v-form">Formulario</button>
     <button class="tab" data-vista="v-seg">Seguimiento de hallazgos <span class="badge" id="badgePend">0</span></button>
-    <button class="tab" data-vista="v-reg">Registros</button>
+    <button class="tab" data-vista="v-reg">🔒 Registros</button>
     <button class="sync" id="syncPill" type="button" title="Estado de envío a Google Drive"><span class="dot"></span><span id="syncTxt">…</span></button>
   </div>
 </nav>
@@ -171,6 +173,7 @@
       <div class="kpi crit"><b id="kCrit">0</b><span>Críticos pendientes</span></div>
     </div>
     <div class="card">
+      <div class="actualiz" id="hallActualiz"></div>
       <div class="filtros">
         <label class="campo">Estado
           <select id="fEstado"><option value="">Todos</option><option>PENDIENTE</option><option>CERRADO</option></select>
@@ -181,6 +184,7 @@
         <label class="campo">Buscar
           <input type="text" id="fTexto" placeholder="Pregunta, comentario, supervisor, responsable…">
         </label>
+        <button class="btn sec" id="btnTraer" type="button">↻ Actualizar</button>
         <button class="btn sec" id="btnCsv" type="button">Exportar a Excel (CSV)</button>
       </div>
       <div class="tabla-wrap">
@@ -251,6 +255,16 @@
       <button class="btn sec" value="cancel" formnovalidate>Cancelar</button>
       <button class="btn" id="dGuardar" value="ok">Guardar</button>
     </div>
+  </form>
+</dialog>
+<dialog id="dlgPin">
+  <form method="dialog" id="pinForm">
+    <div class="dlg-h">🔒 Acceso restringido</div>
+    <div class="dlg-b">
+      <label class="campo">Clave de administrador<input type="password" id="pinIn" autocomplete="current-password"></label>
+      <div class="error-msg" id="pinErr" style="display:none">Clave incorrecta.</div>
+    </div>
+    <div class="dlg-f"><button class="btn sec" value="cancel" formnovalidate>Cancelar</button><button class="btn" id="pinOk" value="ok">Entrar</button></div>
   </form>
 </dialog>
 <dialog id="dlgDet">
@@ -484,9 +498,40 @@ function pintarSync(){
     + (ult?` · <b>Último envío:</b> ${new Date(ult).toLocaleString("es-CL")}`:"")
     + (SYNC.error?`<br><span style="color:var(--rojo)">Último error: ${esc(SYNC.error)} (se reintentará automáticamente)</span>`:"");
 }
-window.addEventListener("online", ()=>{ pintarSync(); sincronizar(); });
+function jsonp(url){
+  return new Promise((res,rej)=>{
+    const cb="__rm"+Date.now()+Math.floor(Math.random()*1e5), s=document.createElement("script");
+    const fin=()=>{ clearTimeout(to); try{ delete window[cb]; }catch(e){} s.remove(); };
+    const to=setTimeout(()=>{ fin(); rej(new Error("Tiempo agotado")); },20000);
+    window[cb]=d=>{ fin(); res(d); }; s.onerror=()=>{ fin(); rej(new Error("Sin respuesta")); };
+    s.src=url+(url.includes("?")?"&":"?")+"callback="+cb+"&t="+Date.now(); document.head.appendChild(s);
+  });
+}
+let TRAYENDO=false;
+async function traerHallazgos(){
+  if(TRAYENDO || !urlScript() || !navigator.onLine) return;
+  TRAYENDO=true;
+  try{
+    const d=await jsonp(urlScript()+"?accion=hallazgos");
+    if(d && d.ok && Array.isArray(d.hallazgos)){
+      const pend=new Set(COLA.filter(c=>c.tipo==="hallazgo").map(c=>c.id)); let cambio=false;
+      d.hallazgos.forEach(s=>{
+        if(!s.id || pend.has(s.id)) return;
+        const l=DB.hallazgos.find(x=>x.id===s.id);
+        if(!l){ DB.hallazgos.push({...s, evid:[], evidCierre:[]}); cambio=true; return; }
+        ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre"].forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
+      });
+      if(cambio){ guardar(); renderHall(); }
+      ls.set(KEY+"_ulth", new Date().toISOString());
+    }
+  }catch(e){}
+  TRAYENDO=false; pintarActualiz();
+}
+function pintarActualiz(){ const u=ls.get(KEY+"_ulth"), el=$("#hallActualiz"); if(el) el.textContent = u ? `Hallazgos de todos los equipos · actualizado ${new Date(u).toLocaleString("es-CL")}` : "Hallazgos de este equipo (se actualizarán con los de todos al haber conexión)"; }
+async function ciclo(){ await sincronizar(); await traerHallazgos(); }
+window.addEventListener("online", ()=>{ pintarSync(); ciclo(); });
 window.addEventListener("offline", pintarSync);
-setInterval(sincronizar, 45000);
+setInterval(ciclo, 45000);
 
 /* ---------- construir formulario ---------- */
 function construir(){
@@ -605,12 +650,32 @@ function limpiar(){
 $("#btnLimpiar").onclick=()=>{ if(confirm("¿Limpiar todas las respuestas y evidencias del formulario?")){ Object.values(PEND).flat().forEach(v=>IDB.del(v.id)); PEND={}; limpiar(); } };
 
 /* ---------- pestañas ---------- */
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+/* Clave de la pestaña Registros (solo administrador). Se guarda como huella SHA-256, no la clave en texto. */
+const PIN_HASH = "35df7e5bbbc61eeb23a476804b00edbe9e45bfb6251058cae9497fef02469019";
+const ss = { get(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ sessionStorage.setItem(k,v); }catch(e){} } };
+let ADMIN = ss.get(KEY+"_admin")==="1";
+async function sha256(txt){ const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function activarTab(t){
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("activa", x===t));
   document.querySelectorAll(".vista").forEach(v=>v.classList.toggle("activa", v.id===t.dataset.vista));
+  if(t.dataset.vista==="v-seg") traerHallazgos();
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  if(t.dataset.vista==="v-reg" && !ADMIN){ $("#pinIn").value=""; $("#pinErr").style.display="none"; $("#dlgPin").showModal(); $("#pinIn").focus(); return; }
+  activarTab(t);
+});
+$("#pinOk").addEventListener("click", async e=>{
+  e.preventDefault();
+  let ok=false; try{ ok = (await sha256($("#pinIn").value.trim())) === PIN_HASH; }catch(err){ toast("Este navegador no permite validar la clave."); }
+  if(!ok){ $("#pinErr").style.display="block"; return; }
+  ADMIN=true; ss.set(KEY+"_admin","1"); $("#dlgPin").close();
+  document.querySelector('.tab[data-vista="v-reg"]').textContent="Registros";
+  activarTab(document.querySelector('.tab[data-vista="v-reg"]'));
 });
 
 /* ---------- seguimiento ---------- */
+function enlaces(txt,et){ const L=String(txt||"").split(/\n/).filter(s=>/^https:\/\//.test(s.trim()));
+  return L.length ? "<div>"+L.map((u,i)=>`<a class="enl" href="${esc(u.trim())}" target="_blank" rel="noopener">📎 ${et} ${i+1}</a>`).join("")+"</div>" : ""; }
 ["#fEstado","#fPrio","#fTexto"].forEach(s=>$(s).addEventListener("input", renderHall));
 function renderHall(){
   const H=DB.hallazgos, fe=$("#fEstado").value, fp=$("#fPrio").value, ft=$("#fTexto").value.toLowerCase();
@@ -626,7 +691,7 @@ function renderHall(){
     <td style="white-space:nowrap"><b>${esc(h.id)}</b></td><td style="white-space:nowrap">${fmt(h.fecha)}</td>
     <td>${esc(h.area)}${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
     <td>${esc(h.pregunta)}</td>
-    <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:""}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:""}</td>
+    <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
     <td class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</td>
     <td>${esc(h.responsable)||'<span class="nota">—</span>'}</td>
     <td${vencido(h)?' style="color:var(--rojo);font-weight:700" title="Plazo vencido"':""}>${fmt(h.plazo)||'<span class="nota">—</span>'}</td>
@@ -710,7 +775,8 @@ $("#fileRestore").onchange=e=>{
 };
 
 $("#cfgUrl").value = urlScript();
-$("#syncPill").onclick = ()=>{ document.querySelector('[data-vista="v-reg"]').click(); sincronizar(); };
+$("#syncPill").onclick = ()=>{ toast($("#syncTxt").textContent); ciclo(); };
+$("#btnTraer").onclick = ()=>{ if(!navigator.onLine){ toast("Sin señal. Se actualizará al volver la conexión."); return; } toast("Actualizando hallazgos…"); traerHallazgos(); };
 $("#btnCfgGuardar").onclick = async ()=>{
   const u=$("#cfgUrl").value.trim();
   if(u && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){ toast("La URL debe terminar en /exec"); return; }
@@ -726,7 +792,7 @@ $("#btnReenviar").onclick = ()=>{
   sincronizar();
 };
 
-cargar(); construir(); render(); pintarSync(); sincronizar();
+cargar(); construir(); render(); pintarSync(); pintarActualiz(); ciclo();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
