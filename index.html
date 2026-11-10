@@ -152,7 +152,7 @@
       <div id="secciones"></div>
       <div class="card">
         <label class="campo">Observaciones generales
-          <textarea id="obsGeneral" placeholder="Notas del verificador (opcional)"></textarea>
+          <textarea id="obsGeneral" placeholder="Notas de quien inspecciona (opcional)"></textarea>
         </label>
       </div>
       <div class="acciones">
@@ -179,7 +179,7 @@
           <select id="fPrio"><option value="">Todas</option><option>Crítica</option><option>Alta</option><option>Mejora</option></select>
         </label>
         <label class="campo">Buscar
-          <input type="text" id="fTexto" placeholder="Pregunta, comentario, líder, responsable…">
+          <input type="text" id="fTexto" placeholder="Pregunta, comentario, supervisor, responsable…">
         </label>
         <button class="btn sec" id="btnCsv" type="button">Exportar a Excel (CSV)</button>
       </div>
@@ -216,7 +216,7 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Verificador</th><th>Área / Lugar</th><th>Líder evaluado</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Inspeccionado por</th><th>Área / Lugar</th><th>Supervisor evaluado</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th></th></tr></thead>
           <tbody id="tbReg"></tbody>
         </table>
       </div>
@@ -281,9 +281,9 @@ const CONFIG = {
   subtitulo: "Lista de verificación en terreno",
   datosGenerales: [
     {id:"fecha",       label:"Fecha",                    tipo:"date",   req:true},
-    {id:"verificador", label:"Nombre del verificador",   tipo:"text",   req:true},
+    {id:"verificador", label:"Nombre de quien inspecciona", tipo:"text",   req:true},
     {id:"area",        label:"Área / Lugar",             tipo:"select", opciones:["Planta","Depósito de Relaves","Mina","Proyectos","Izaje"], req:true},
-    {id:"lider",       label:"Nombre del líder evaluado", tipo:"text",  req:true}
+    {id:"lider",       label:"Supervisor evaluado", tipo:"text",  req:true}
   ],
   secciones: [
     { titulo:"1. Requisitos a las Personas",
@@ -624,7 +624,7 @@ function renderHall(){
   const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
   $("#tbHall").innerHTML = L.length ? L.map(h=>`<tr>
     <td style="white-space:nowrap"><b>${esc(h.id)}</b></td><td style="white-space:nowrap">${fmt(h.fecha)}</td>
-    <td>${esc(h.area)}${h.lider?`<br><span class="nota">Líder: ${esc(h.lider)}</span>`:""}</td>
+    <td>${esc(h.area)}${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
     <td>${esc(h.pregunta)}</td>
     <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:""}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:""}</td>
     <td class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</td>
@@ -688,7 +688,7 @@ function descargar(nombre, contenido, tipo){
 }
 const csv = filas => "﻿"+filas.map(f=>f.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n");
 $("#btnCsv").onclick=()=>descargar(`hallazgos_${hoy()}.csv`, csv([
-  ["N°","Fecha","Verificador","Área","Líder evaluado","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
+  ["N°","Fecha","Quien inspecciona","Área","Supervisor evaluado","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
   ...DB.hallazgos.map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado,h.cierre,fmt(h.fechaCierre),(h.evid||[]).map(v=>v.name).join(", "),(h.evidCierre||[]).map(v=>v.name).join(", ")])
 ]),"text/csv;charset=utf-8");
 $("#btnCsvResp").onclick=()=>{
