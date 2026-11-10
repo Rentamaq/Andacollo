@@ -467,6 +467,7 @@ function pintarSync(){
   if(!u){ cls="pend"; txt = n ? `${n} por enviar · sin configurar` : "Drive sin configurar"; }
   else if(SYNC.corriendo){ cls="run"; txt=`Enviando… (${n})`; }
   else if(!on){ cls="off"; txt = n ? `Sin señal · ${n} por enviar` : "Sin señal · todo guardado"; }
+  else if(SYNC.error){ cls="off"; txt = n ? `Error de conexión · ${n} por enviar` : "Error de conexión con Drive"; }
   else if(n){ cls="pend"; txt=`${n} por enviar`; }
   else { cls="ok"; txt="Sincronizado"; }
   p.className="sync "+cls; $("#syncTxt").textContent=txt;
@@ -706,7 +707,7 @@ $("#btnCfgGuardar").onclick = async ()=>{
   if(u && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){ toast("La URL debe terminar en /exec"); return; }
   ls.set(KURL,u); pintarSync(); if(!u) return;
   if(!navigator.onLine){ toast("Guardado. Se probará cuando haya señal."); return; }
-  try{ await enviar({tipo:"ping"}); toast("Conexión con Drive OK."); sincronizar(); }catch(e){ SYNC.error=e.message; pintarSync(); toast("No se pudo conectar: "+e.message); }
+  try{ await enviar({tipo:"ping"}); SYNC.error=""; pintarSync(); toast("Conexión con Drive OK."); sincronizar(); }catch(e){ SYNC.error=e.message; pintarSync(); toast("No se pudo conectar: "+e.message); }
 };
 $("#btnSyncAhora").onclick = ()=>{ if(!navigator.onLine) toast("Sin señal. Se enviará al volver la conexión."); sincronizar(); };
 $("#btnReenviar").onclick = ()=>{
