@@ -444,7 +444,16 @@ async function cargaUtil(c){
   return null;
 }
 async function enviar(payload){
-  const r = await fetch(urlScript(), {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+  const body = JSON.stringify(payload);
+  let r;
+  try{
+    r = await fetch(urlScript(), {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body});
+  }catch(e){
+    // Algunos navegadores/archivos locales bloquean leer la respuesta de Google:
+    // se reenvía en modo "no-cors"; si Google recibe el envío, la promesa se resuelve.
+    await fetch(urlScript(), {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body});
+    return {ok:true, sinConfirmacion:true};
+  }
   const j = await r.json(); if(!j.ok) throw new Error(j.error||"Error del servidor"); return j;
 }
 async function sincronizar(){
