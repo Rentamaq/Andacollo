@@ -124,6 +124,9 @@
   .kpi.insp{border-left-color:var(--naranjo)}
   .pct{font-weight:700} .pct.b{color:var(--verde)} .pct.m{color:var(--naranjo-osc)} .pct.r{color:var(--rojo)}
   details.insp-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc);margin:4px 0 10px}
+  body:not(.admin) .solo-admin{display:none}
+  .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
+  .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
 </style>
 </head>
@@ -190,7 +193,7 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Supervisor evaluado</th><th>Área / Lugar</th><th>Inspeccionado por</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th>Hallazgos</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Supervisor evaluado</th><th>Área / Lugar</th><th>Inspeccionado por</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th>Hallazgos</th><th class="solo-admin"></th></tr></thead>
           <tbody id="tbInsp"></tbody>
         </table>
       </div>
@@ -485,6 +488,7 @@ async function cargaUtil(c){
   if(c.tipo==="evidencia"){ const v=await IDB.get(c.id); return v ? {tipo:"evidencia", id:c.id, name:v.name, type:v.type, data:v.data} : null; }
   if(c.tipo==="registro"){ const r=DB.registros.find(x=>x.id===c.id); return r ? {tipo:"registro", registro:r} : null; }
   if(c.tipo==="hallazgo"){ const h=DB.hallazgos.find(x=>x.id===c.id); return h ? {tipo:"hallazgo", hallazgo:h} : null; }
+  if(c.tipo==="eliminar") return {tipo:"eliminar", id:c.id, clave:c.clave||""};
   return null;
 }
 async function enviar(payload){
@@ -552,6 +556,7 @@ async function traerHallazgos(){
         ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre"].forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
       });
       if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true; }
+      if(Array.isArray(d.eliminados) && d.eliminados.length){ if(quitarLocal(new Set(d.eliminados))) cambio=true; }
       if(cambio){ guardar(); renderHall(); }
       ls.set(KEY+"_ulth", new Date().toISOString());
     }
@@ -699,7 +704,7 @@ $("#pinOk").addEventListener("click", async e=>{
   e.preventDefault();
   let ok=false; try{ ok = (await sha256($("#pinIn").value.trim())) === PIN_HASH; }catch(err){ toast("Este navegador no permite validar la clave."); }
   if(!ok){ $("#pinErr").style.display="block"; return; }
-  ADMIN=true; ss.set(KEY+"_admin","1"); $("#dlgPin").close();
+  ADMIN=true; ss.set(KEY+"_admin","1"); ss.set(KEY+"_clave",$("#pinIn").value.trim()); document.body.classList.add("admin"); $("#dlgPin").close();
   document.querySelector('.tab[data-vista="v-reg"]').textContent="Registros";
   activarTab(document.querySelector('.tab[data-vista="v-reg"]'));
 });
@@ -732,9 +737,27 @@ function renderInsp(){
     return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td>${esc(x.area)}</td><td>${esc(x.verificador)}</td>
       <td style="color:var(--verde);font-weight:700">${x.si}</td><td style="color:var(--rojo);font-weight:700">${x.no}</td><td>${x.na}</td>
       <td>${p===null?"—":`<span class="pct ${cls(p)}">${Math.round(p*100)}%</span>`}</td>
-      <td>${(nh||+x.no)?`<span class="estado PENDIENTE">${nh||x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td></tr>`; }).join("")
-    : `<tr><td colspan="9" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
+      <td>${(nh||+x.no)?`<span class="estado PENDIENTE">${nh||x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td>
+      <td class="solo-admin"><button class="btn-del" type="button" data-del-insp="${esc(x.id)}" title="Eliminar inspección">🗑</button></td></tr>`; }).join("")
+    : `<tr><td colspan="10" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
 }
+/* ---------- eliminar inspecciones (solo administrador) ---------- */
+function quitarLocal(ids){
+  const n0=DB.registros.length+DB.hallazgos.length+(DB.inspecciones||[]).length;
+  DB.registros.filter(r=>ids.has(r.id)).forEach(r=>r.respuestas.forEach(x=>(x.evid||[]).forEach(v=>IDB.del(v.id))));
+  DB.registros=DB.registros.filter(r=>!ids.has(r.id));
+  DB.hallazgos=DB.hallazgos.filter(h=>!ids.has(h.registro));
+  DB.inspecciones=(DB.inspecciones||[]).filter(x=>!ids.has(x.id));
+  return n0 !== DB.registros.length+DB.hallazgos.length+DB.inspecciones.length;
+}
+$("#tbInsp").addEventListener("click", e=>{
+  const id=e.target.dataset.delInsp; if(!id || !ADMIN) return;
+  const x=listaInspecciones().find(i=>i.id===id); if(!x) return;
+  if(!confirm(`¿Eliminar la inspección del ${fmt(x.fecha)} a ${x.lider} (${x.area})?\n\nSe borrará de la planilla de Drive, junto con sus respuestas y hallazgos, y desaparecerá de todos los equipos. No se puede deshacer.`)) return;
+  COLA=COLA.filter(c=>!(c.tipo==="registro" && c.id===id));
+  COLA.push({tipo:"eliminar", id, clave: ss.get(KEY+"_clave")||""}); guardarCola(); quitarLocal(new Set([id])); guardar(); render(); ciclo();
+  toast("Inspección eliminada.");
+});
 ["#iArea","#iDesde","#iHasta","#iTexto"].forEach(s=>$(s).addEventListener("input", renderInsp));
 function renderHall(){
   renderInsp();
@@ -856,6 +879,7 @@ $("#btnReenviar").onclick = ()=>{
   sincronizar();
 };
 
+if(ADMIN) document.body.classList.add("admin");
 cargar(); construir(); render(); pintarSync(); pintarActualiz(); ciclo();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
