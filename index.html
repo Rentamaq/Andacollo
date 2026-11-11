@@ -300,6 +300,19 @@
     <div class="dlg-f"><button class="btn sec" value="cancel" formnovalidate>Cancelar</button><button class="btn" id="pinOk" value="ok">Entrar</button></div>
   </form>
 </dialog>
+<dialog id="dlgInsp">
+  <form method="dialog" id="inspForm">
+    <div class="dlg-h">✏️ Editar inspección <span class="nota" id="eiId"></span></div>
+    <div class="dlg-b">
+      <label class="campo">Fecha<input type="date" id="eiFecha" required></label>
+      <label class="campo">Inspeccionado por (quien inspecciona)<input type="text" id="eiVerif" required></label>
+      <label class="campo">Área / Lugar<select id="eiArea"><option>Planta</option><option>Depósito de Relaves</option><option>Mina</option><option>Proyectos</option><option>Izaje</option></select></label>
+      <label class="campo">Supervisor evaluado<input type="text" id="eiLider" required></label>
+      <div class="nota">El cambio se aplica también a las respuestas y hallazgos de esta inspección, en la planilla y en todos los equipos.</div>
+    </div>
+    <div class="dlg-f"><button class="btn sec" value="cancel" formnovalidate>Cancelar</button><button class="btn" id="eiOk" value="ok">Guardar</button></div>
+  </form>
+</dialog>
 <dialog id="dlgDet">
   <form method="dialog">
     <div class="dlg-h" id="detTit">Detalle del formulario</div>
@@ -490,6 +503,7 @@ async function cargaUtil(c){
   if(c.tipo==="registro"){ const r=DB.registros.find(x=>x.id===c.id); return r ? {tipo:"registro", registro:r} : null; }
   if(c.tipo==="hallazgo"){ const h=DB.hallazgos.find(x=>x.id===c.id); return h ? {tipo:"hallazgo", hallazgo:h} : null; }
   if(c.tipo==="eliminar" || c.tipo==="eliminarHallazgo") return {tipo:c.tipo, id:c.id, clave:c.clave||""};
+  if(c.tipo==="editarRegistro") return {tipo:c.tipo, id:c.id, datos:c.datos, clave:c.clave||""};
   return null;
 }
 async function enviar(payload){
@@ -554,9 +568,10 @@ async function traerHallazgos(){
         if(!s.id || pend.has(s.id)) return;
         const l=DB.hallazgos.find(x=>x.id===s.id);
         if(!l){ DB.hallazgos.push({...s, evid:[], evidCierre:[]}); cambio=true; return; }
-        ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre"].forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
+        ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre","fecha","verificador","area","lider"].forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
       });
       if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true; }
+      COLA.filter(c=>c.tipo==="editarRegistro").forEach(aplicarEdicion);
       if(Array.isArray(d.eliminados) && d.eliminados.length){ if(quitarLocal(new Set(d.eliminados))) cambio=true; }
       if(cambio){ guardar(); renderHall(); }
       ls.set(KEY+"_ulth", new Date().toISOString());
@@ -739,7 +754,7 @@ function renderInsp(){
       <td style="color:var(--verde);font-weight:700">${x.si}</td><td style="color:var(--rojo);font-weight:700">${x.no}</td><td>${x.na}</td>
       <td>${p===null?"—":`<span class="pct ${cls(p)}">${Math.round(p*100)}%</span>`}</td>
       <td>${(nh||+x.no)?`<span class="estado PENDIENTE">${nh||x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td>
-      <td class="solo-admin"><button class="btn-del" type="button" data-del-insp="${esc(x.id)}" title="Eliminar inspección">🗑</button></td></tr>`; }).join("")
+      <td class="solo-admin" style="white-space:nowrap"><button class="btn sec peq" type="button" data-edit-insp="${esc(x.id)}" title="Editar inspección">✏️</button> <button class="btn-del" type="button" data-del-insp="${esc(x.id)}" title="Eliminar inspección">🗑</button></td></tr>`; }).join("")
     : `<tr><td colspan="10" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
 }
 /* ---------- eliminar inspecciones (solo administrador) ---------- */
@@ -751,6 +766,29 @@ function quitarLocal(ids){
   DB.inspecciones=(DB.inspecciones||[]).filter(x=>!ids.has(x.id));
   return n0 !== DB.registros.length+DB.hallazgos.length+DB.inspecciones.length;
 }
+/* ---------- editar inspecciones (solo administrador) ---------- */
+function aplicarEdicion(c){
+  const d=c.datos||{};
+  const r=DB.registros.find(x=>x.id===c.id); if(r) Object.assign(r.datos,d);
+  (DB.inspecciones||[]).forEach(x=>{ if(x.id===c.id) Object.assign(x,d); });
+  DB.hallazgos.forEach(h=>{ if(h.registro===c.id) Object.assign(h,d); });
+}
+let EDIT_INSP=null;
+$("#tbInsp").addEventListener("click", e=>{
+  const id=e.target.dataset.editInsp; if(!id || !ADMIN) return;
+  const x=listaInspecciones().find(i=>i.id===id); if(!x) return;
+  EDIT_INSP=id; $("#eiId").textContent=id;
+  $("#eiFecha").value=x.fecha||""; $("#eiVerif").value=x.verificador||""; $("#eiArea").value=x.area||"Planta"; $("#eiLider").value=x.lider||"";
+  $("#dlgInsp").showModal();
+});
+$("#eiOk").addEventListener("click", e=>{
+  e.preventDefault(); if(!ADMIN || !EDIT_INSP) return;
+  const datos={fecha:$("#eiFecha").value, verificador:$("#eiVerif").value.trim(), area:$("#eiArea").value, lider:$("#eiLider").value.trim()};
+  if(!datos.fecha || !datos.verificador || !datos.lider){ toast("Completa fecha, quien inspecciona y supervisor."); return; }
+  const c={tipo:"editarRegistro", id:EDIT_INSP, datos, clave: ss.get(KEY+"_clave")||""};
+  COLA=COLA.filter(q=>!(q.tipo==="editarRegistro" && q.id===EDIT_INSP)); COLA.push(c); guardarCola();
+  aplicarEdicion(c); guardar(); $("#dlgInsp").close(); render(); ciclo(); toast("Inspección actualizada.");
+});
 $("#tbInsp").addEventListener("click", e=>{
   const id=e.target.dataset.delInsp; if(!id || !ADMIN) return;
   const x=listaInspecciones().find(i=>i.id===id); if(!x) return;
