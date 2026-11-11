@@ -126,6 +126,16 @@
   details.insp-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc);margin:4px 0 10px}
   body:not(.admin) .solo-admin{display:none}
   .dias{font-size:12px;font-weight:700;margin-top:3px;white-space:nowrap}.dias.ok{color:var(--verde)}.dias.pronto{color:var(--naranjo-osc)}.dias.tarde{color:var(--rojo)}
+  .info-insp{border-top:4px solid var(--gris,#3F3F3F)}
+  .info-insp h3{margin:0 0 6px;font-size:16px}
+  .info-insp p{margin:0 0 12px;font-size:14px;color:#555}
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+  .info-b{border-radius:8px;padding:10px 12px;font-size:13.5px;border-left:5px solid}
+  .info-b ul{margin:6px 0 0;padding-left:18px}.info-b li{margin:2px 0}
+  .info-b .nota{display:block;font-weight:400}
+  .info-b.rojo{background:var(--rojo-claro);border-color:var(--rojo)}.info-b.rojo b{color:var(--rojo)}
+  .info-b.nar{background:var(--naranjo-claro);border-color:var(--naranjo)}.info-b.nar b{color:var(--naranjo-osc)}
+  .info-b.gris{background:#F1F1F1;border-color:#8A8A8A}
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -158,6 +168,18 @@
         <h2>Datos de la verificación</h2>
         <p class="sub">Los campos marcados con <span class="req">*</span> son obligatorios.</p>
         <div class="grid" id="datosGenerales"></div>
+      </div>
+      <div class="card info-insp">
+        <h3>ℹ️ Consideraciones al encontrar desviaciones</h3>
+        <p>Al momento que realicemos inspecciones y encontremos desviaciones, estas son las consideraciones que debemos tener para saber si un hallazgo lo podemos solucionar de inmediato, darle más tiempo o si es corregible en el momento.</p>
+        <div class="info-grid">
+          <div class="info-b rojo"><b>🛑 Acciones con detención inmediata de operación</b><ul>
+            <li>Trabajar sin PTS</li><li>Riesgo inminente a la persona / equipos / acción</li><li>Desviación a requisitos HPRC</li><li>Sin procedimiento específico de la tarea</li><li>Sin difusión de procedimiento y/o evaluación</li><li>Sin licencia interna / municipal</li><li>Sin HCR</li><li>Sin OT</li></ul></div>
+          <div class="info-b gris"><b>🕒 Acciones con subsanación a mediano plazo</b><span class="nota">(no depende directamente del contrato)</span><ul>
+            <li>Condición que no afecte a la persona</li></ul></div>
+          <div class="info-b nar"><b>⚡ Acciones con subsanación inmediata</b><ul>
+            <li>HCR mal confeccionado</li><li>Teck 5 mal confeccionado</li><li>Sin EPP</li><li>Desviación a procedimiento de trabajo</li><li>Acción insegura / condición insegura</li></ul></div>
+        </div>
       </div>
       <div id="secciones"></div>
       <div class="card">
