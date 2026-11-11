@@ -271,7 +271,7 @@
         <select id="dEstado"><option>PENDIENTE</option><option>CERRADO</option></select>
       </label>
       <div class="grid">
-        <label class="campo">Responsable<input type="text" id="dResp"></label>
+        <label class="campo">Responsable (quien levantó)<input type="text" id="dResp"></label>
         <label class="campo">Plazo<input type="date" id="dPlazo"></label>
       </div>
       <label class="campo">Medida aplicada / evidencia de cierre
@@ -620,7 +620,7 @@ function construir(){
           <div class="grid" style="margin-top:8px">
             <label class="campo">Prioridad
               <select class="c-prio"><option>Alta</option><option>Crítica</option><option>Mejora</option></select></label>
-            <label class="campo">Responsable<input type="text" class="c-resp"></label>
+            <div class="campo">Responsable<div class="nota" style="padding:9px 0">Quien inspecciona (se asigna automáticamente)</div></div>
             <label class="campo">Plazo<input type="date" class="c-plazo"></label>
           </div>
         </div>
@@ -664,7 +664,6 @@ $("#form").addEventListener("submit", e=>{
     respuestas.push({n:+box.dataset.n, pregunta:texto, valor:sel?sel.value:"",
       comentario: box.querySelector(".c-txt").value.trim(),
       prioridad: box.querySelector(".c-prio").value,
-      responsable: box.querySelector(".c-resp").value.trim(),
       plazo: box.querySelector(".c-plazo").value,
       seccion: box.closest(".seccion").querySelector("h2").textContent,
       evid: (PEND[box.dataset.id]||[]).slice()});
@@ -678,7 +677,7 @@ $("#form").addEventListener("submit", e=>{
     DB.seq=(DB.seq||0)+1; nuevos++;
     DB.hallazgos.push({id:"H-"+DISP+"-"+String(DB.seq).padStart(4,"0"), registro:regId, fecha:datos.fecha,
       area:datos.area, lider:datos.lider, verificador:datos.verificador,
-      pregunta:r.pregunta, comentario:r.comentario, prioridad:r.prioridad, responsable:r.responsable,
+      pregunta:r.pregunta, comentario:r.comentario, prioridad:r.prioridad, responsable:datos.verificador,
       plazo:r.plazo, estado:"PENDIENTE", cierre:"", fechaCierre:"", evid:r.evid, evidCierre:[]});
   });
   guardar();
@@ -771,7 +770,7 @@ function aplicarEdicion(c){
   const d=c.datos||{};
   const r=DB.registros.find(x=>x.id===c.id); if(r) Object.assign(r.datos,d);
   (DB.inspecciones||[]).forEach(x=>{ if(x.id===c.id) Object.assign(x,d); });
-  DB.hallazgos.forEach(h=>{ if(h.registro===c.id) Object.assign(h,d); });
+  DB.hallazgos.forEach(h=>{ if(h.registro!==c.id) return; if(d.verificador && h.responsable===h.verificador) h.responsable=d.verificador; Object.assign(h,d); });
 }
 let EDIT_INSP=null;
 $("#tbInsp").addEventListener("click", e=>{
