@@ -120,6 +120,10 @@
   .estado-sync{font-size:13.5px;margin:8px 0}
   .enl{white-space:nowrap;display:inline-block;margin:6px 6px 0 0;font-size:12.5px;font-weight:600;color:var(--naranjo-osc);text-decoration:none;border:1px solid var(--naranjo);border-radius:12px;padding:1px 9px}
   .actualiz{font-size:12.5px;color:var(--gris-2);margin:-4px 0 10px}
+  .subtit{font-size:16px;margin:4px 0 10px;color:var(--gris)}
+  .kpi.insp{border-left-color:var(--naranjo)}
+  .pct{font-weight:700} .pct.b{color:var(--verde)} .pct.m{color:var(--naranjo-osc)} .pct.r{color:var(--rojo)}
+  details.insp-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc);margin:4px 0 10px}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
 </style>
 </head>
@@ -166,6 +170,32 @@
 
   <!-- ================= SEGUIMIENTO ================= -->
   <section id="v-seg" class="vista">
+    <h2 class="subtit">Inspecciones realizadas</h2>
+    <div class="kpis">
+      <div class="kpi insp"><b id="iTotal">0</b><span>Inspecciones realizadas</span></div>
+      <div class="kpi"><b id="iSup">0</b><span>Supervisores evaluados</span></div>
+      <div class="kpi cerr"><b id="iSin">0</b><span>Sin hallazgos</span></div>
+      <div class="kpi pend"><b id="iCon">0</b><span>Con hallazgos</span></div>
+      <div class="kpi"><b id="iPct">—</b><span>% cumplimiento promedio</span></div>
+    </div>
+    <div class="card">
+      <div class="filtros">
+        <label class="campo">Área / Lugar
+          <select id="iArea"><option value="">Todas</option><option>Planta</option><option>Depósito de Relaves</option><option>Mina</option><option>Proyectos</option><option>Izaje</option></select>
+        </label>
+        <label class="campo">Desde<input type="date" id="iDesde"></label>
+        <label class="campo">Hasta<input type="date" id="iHasta"></label>
+        <label class="campo">Buscar<input type="text" id="iTexto" placeholder="Supervisor o quien inspecciona…"></label>
+        <button class="btn sec" id="btnCsvInsp" type="button">Exportar a Excel (CSV)</button>
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Supervisor evaluado</th><th>Área / Lugar</th><th>Inspeccionado por</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th>Hallazgos</th></tr></thead>
+          <tbody id="tbInsp"></tbody>
+        </table>
+      </div>
+    </div>
+    <h2 class="subtit" style="margin-top:22px">Hallazgos</h2>
     <div class="kpis">
       <div class="kpi"><b id="kTotal">0</b><span>Hallazgos totales</span></div>
       <div class="kpi pend"><b id="kPend">0</b><span>PENDIENTES</span></div>
@@ -521,6 +551,7 @@ async function traerHallazgos(){
         if(!l){ DB.hallazgos.push({...s, evid:[], evidCierre:[]}); cambio=true; return; }
         ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre"].forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
       });
+      if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true; }
       if(cambio){ guardar(); renderHall(); }
       ls.set(KEY+"_ulth", new Date().toISOString());
     }
@@ -677,7 +708,36 @@ $("#pinOk").addEventListener("click", async e=>{
 function enlaces(txt,et){ const L=String(txt||"").split(/\n/).filter(s=>/^https:\/\//.test(s.trim()));
   return L.length ? "<div>"+L.map((u,i)=>`<a class="enl" href="${esc(u.trim())}" target="_blank" rel="noopener">📎 ${et} ${i+1}</a>`).join("")+"</div>" : ""; }
 ["#fEstado","#fPrio","#fTexto"].forEach(s=>$(s).addEventListener("input", renderHall));
+function listaInspecciones(){
+  const m=new Map();
+  (DB.inspecciones||[]).forEach(x=>m.set(x.id,{...x}));
+  DB.registros.forEach(r=>{ if(m.has(r.id)) return; const c=v=>r.respuestas.filter(x=>x.valor===v).length, si=c("SI"), no=c("NO"), na=c("NA");
+    m.set(r.id,{id:r.id, fecha:r.datos.fecha, verificador:r.datos.verificador, area:r.datos.area, lider:r.datos.lider, si, no, na, pct: si+no? si/(si+no) : null}); });
+  return [...m.values()].map(x=>({...x, hall: DB.hallazgos.filter(h=>h.registro===x.id).length}));
+}
+let INSP_VISTA=[];
+function renderInsp(){
+  const fa=$("#iArea").value, fd=$("#iDesde").value, fh=$("#iHasta").value, ft=$("#iTexto").value.toLowerCase();
+  const L=listaInspecciones().filter(x=>(!fa||x.area===fa)&&(!fd||x.fecha>=fd)&&(!fh||x.fecha<=fh)&&(!ft||[x.lider,x.verificador].join(" ").toLowerCase().includes(ft)))
+    .sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||String(b.id).localeCompare(String(a.id)));
+  INSP_VISTA=L;
+  const pcts=L.map(x=>x.pct).filter(p=>p!==null && p!=="" && !isNaN(p));
+  $("#iTotal").textContent=L.length;
+  $("#iSup").textContent=new Set(L.map(x=>String(x.lider||"").trim().toLowerCase()).filter(Boolean)).size;
+  $("#iCon").textContent=L.filter(x=>x.hall>0 || +x.no>0).length;
+  $("#iSin").textContent=L.filter(x=>!(x.hall>0 || +x.no>0)).length;
+  $("#iPct").textContent=pcts.length? Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%" : "—";
+  const cls=p=>p>=.9?"b":p>=.7?"m":"r";
+  $("#tbInsp").innerHTML = L.length ? L.map(x=>{ const p=(x.pct===null||x.pct===""||isNaN(x.pct))?null:+x.pct; const nh=Math.max(x.hall, 0);
+    return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td>${esc(x.area)}</td><td>${esc(x.verificador)}</td>
+      <td style="color:var(--verde);font-weight:700">${x.si}</td><td style="color:var(--rojo);font-weight:700">${x.no}</td><td>${x.na}</td>
+      <td>${p===null?"—":`<span class="pct ${cls(p)}">${Math.round(p*100)}%</span>`}</td>
+      <td>${(nh||+x.no)?`<span class="estado PENDIENTE">${nh||x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td></tr>`; }).join("")
+    : `<tr><td colspan="9" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
+}
+["#iArea","#iDesde","#iHasta","#iTexto"].forEach(s=>$(s).addEventListener("input", renderInsp));
 function renderHall(){
+  renderInsp();
   const H=DB.hallazgos, fe=$("#fEstado").value, fp=$("#fPrio").value, ft=$("#fTexto").value.toLowerCase();
   const pend=H.filter(h=>h.estado==="PENDIENTE");
   $("#kTotal").textContent=H.length; $("#kPend").textContent=pend.length;
@@ -755,6 +815,10 @@ const csv = filas => "﻿"+filas.map(f=>f.map(v=>`"${String(v??"").replace(/"/g,
 $("#btnCsv").onclick=()=>descargar(`hallazgos_${hoy()}.csv`, csv([
   ["N°","Fecha","Quien inspecciona","Área","Supervisor evaluado","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
   ...DB.hallazgos.map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado,h.cierre,fmt(h.fechaCierre),(h.evid||[]).map(v=>v.name).join(", "),(h.evidCierre||[]).map(v=>v.name).join(", ")])
+]),"text/csv;charset=utf-8");
+$("#btnCsvInsp").onclick=()=>descargar(`inspecciones_${hoy()}.csv`, csv([
+  ["Fecha","Supervisor evaluado","Área","Quien inspecciona","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
+  ...INSP_VISTA.map(x=>[fmt(x.fecha),x.lider,x.area,x.verificador,x.si,x.no,x.na,(x.pct===null||x.pct===""||isNaN(x.pct))?"":Math.round(x.pct*100)+"%",x.hall||x.no])
 ]),"text/csv;charset=utf-8");
 $("#btnCsvResp").onclick=()=>{
   const cab=[...CONFIG.datosGenerales.map(c=>c.label),"Sección","N°","Pregunta","Respuesta","Comentario","Evidencias"];
