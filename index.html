@@ -222,7 +222,7 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>N°</th><th>Fecha</th><th>Área / Lugar</th><th>Pregunta (respuesta NO)</th><th>Comentario</th><th>Prioridad</th><th>Responsable</th><th>Plazo</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>N°</th><th>Fecha</th><th>Levantado por</th><th>Área / Lugar</th><th>Pregunta (desviación)</th><th>Comentario</th><th>Prioridad</th><th>Responsable</th><th>Plazo</th><th>Estado</th><th></th></tr></thead>
           <tbody id="tbHall"></tbody>
         </table>
       </div>
@@ -451,7 +451,8 @@ function pintarEvidPreg(box){
   cont.innerHTML=thumbs(L,{del:"q:"+q}); hidratar(cont);
   const c=box.querySelector(".cnt"); c.hidden=!L.length; c.textContent=L.length;
 }
-function pintarEvidDlg(){ const c=$("#dEvids"); c.innerHTML=thumbs(DLG_EV,{del:"dlg"}); hidratar(c); }
+let DLG_SOLO=false;
+function pintarEvidDlg(){ const c=$("#dEvids"); c.innerHTML=thumbs(DLG_EV, DLG_SOLO?{}:{del:"dlg"}); hidratar(c); }
 document.addEventListener("click", e=>{
   const x=e.target.closest("[data-del]");
   if(x){ e.preventDefault(); e.stopPropagation(); const id=x.dataset.del, ctx=x.dataset.ctx;
@@ -488,7 +489,7 @@ async function cargaUtil(c){
   if(c.tipo==="evidencia"){ const v=await IDB.get(c.id); return v ? {tipo:"evidencia", id:c.id, name:v.name, type:v.type, data:v.data} : null; }
   if(c.tipo==="registro"){ const r=DB.registros.find(x=>x.id===c.id); return r ? {tipo:"registro", registro:r} : null; }
   if(c.tipo==="hallazgo"){ const h=DB.hallazgos.find(x=>x.id===c.id); return h ? {tipo:"hallazgo", hallazgo:h} : null; }
-  if(c.tipo==="eliminar") return {tipo:"eliminar", id:c.id, clave:c.clave||""};
+  if(c.tipo==="eliminar" || c.tipo==="eliminarHallazgo") return {tipo:c.tipo, id:c.id, clave:c.clave||""};
   return null;
 }
 async function enviar(payload){
@@ -704,7 +705,7 @@ $("#pinOk").addEventListener("click", async e=>{
   e.preventDefault();
   let ok=false; try{ ok = (await sha256($("#pinIn").value.trim())) === PIN_HASH; }catch(err){ toast("Este navegador no permite validar la clave."); }
   if(!ok){ $("#pinErr").style.display="block"; return; }
-  ADMIN=true; ss.set(KEY+"_admin","1"); ss.set(KEY+"_clave",$("#pinIn").value.trim()); document.body.classList.add("admin"); $("#dlgPin").close();
+  ADMIN=true; renderHall(); ss.set(KEY+"_admin","1"); ss.set(KEY+"_clave",$("#pinIn").value.trim()); document.body.classList.add("admin"); $("#dlgPin").close();
   document.querySelector('.tab[data-vista="v-reg"]').textContent="Registros";
   activarTab(document.querySelector('.tab[data-vista="v-reg"]'));
 });
@@ -746,7 +747,7 @@ function quitarLocal(ids){
   const n0=DB.registros.length+DB.hallazgos.length+(DB.inspecciones||[]).length;
   DB.registros.filter(r=>ids.has(r.id)).forEach(r=>r.respuestas.forEach(x=>(x.evid||[]).forEach(v=>IDB.del(v.id))));
   DB.registros=DB.registros.filter(r=>!ids.has(r.id));
-  DB.hallazgos=DB.hallazgos.filter(h=>!ids.has(h.registro));
+  DB.hallazgos=DB.hallazgos.filter(h=>!ids.has(h.registro) && !ids.has(h.id));
   DB.inspecciones=(DB.inspecciones||[]).filter(x=>!ids.has(x.id));
   return n0 !== DB.registros.length+DB.hallazgos.length+DB.inspecciones.length;
 }
@@ -772,6 +773,7 @@ function renderHall(){
   const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
   $("#tbHall").innerHTML = L.length ? L.map(h=>`<tr>
     <td style="white-space:nowrap"><b>${esc(h.id)}</b></td><td style="white-space:nowrap">${fmt(h.fecha)}</td>
+    <td><b>${esc(h.verificador)||"—"}</b></td>
     <td>${esc(h.area)}${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
     <td>${esc(h.pregunta)}</td>
     <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
@@ -779,26 +781,44 @@ function renderHall(){
     <td>${esc(h.responsable)||'<span class="nota">—</span>'}</td>
     <td${vencido(h)?' style="color:var(--rojo);font-weight:700" title="Plazo vencido"':""}>${fmt(h.plazo)||'<span class="nota">—</span>'}</td>
     <td><span class="estado ${h.estado}">${h.estado}</span>${h.fechaCierre?`<br><span class="nota">${fmt(h.fechaCierre)}</span>`:""}</td>
-    <td><button class="btn sec peq" data-edit="${esc(h.id)}">Editar</button></td></tr>`).join("")
-    : `<tr><td colspan="10" class="vacio">No hay hallazgos${H.length?" con esos filtros":". Se crean automáticamente cuando una respuesta es NO"}.</td></tr>`;
+    <td style="white-space:nowrap"><button class="btn sec peq" data-edit="${esc(h.id)}">${ADMIN?"Editar":h.estado==="PENDIENTE"?"Cerrar":"Ver"}</button>
+      <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`).join("")
+    : `<tr><td colspan="11" class="vacio">No hay hallazgos${H.length?" con esos filtros":". Se crean automáticamente cuando una respuesta es NO"}.</td></tr>`;
   hidratar($("#tbHall"));
 }
 let editId=null;
 $("#tbHall").addEventListener("click", e=>{
+  const del=e.target.dataset.delHall;
+  if(del && ADMIN){
+    const h=DB.hallazgos.find(x=>x.id===del); if(!h) return;
+    if(!confirm(`¿Eliminar el hallazgo ${h.id} (${h.pregunta})?\n\nSe borrará de la planilla de Drive y de todos los equipos. No se puede deshacer.`)) return;
+    COLA=COLA.filter(c=>!(c.tipo==="hallazgo" && c.id===del));
+    COLA.push({tipo:"eliminarHallazgo", id:del, clave: ss.get(KEY+"_clave")||""}); guardarCola();
+    quitarLocal(new Set([del])); guardar(); render(); ciclo(); toast("Hallazgo eliminado."); return;
+  }
   const id=e.target.dataset.edit; if(!id) return;
   const h=DB.hallazgos.find(x=>x.id===id); editId=id;
-  $("#dlgTit").textContent="Actualizar hallazgo "+id;
-  $("#dlgPreg").innerHTML=`<b>${esc(h.pregunta)}</b><br>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:""}`;
+  const soloVer = !ADMIN && h.estado==="CERRADO";
+  $("#dlgTit").textContent=(ADMIN?"Actualizar":soloVer?"Detalle":"Cerrar")+" hallazgo "+id;
+  $("#dlgPreg").innerHTML=`<div class="nota">Levantado por <b>${esc(h.verificador)||"—"}</b> · ${fmt(h.fecha)} · ${esc(h.area)}${h.lider?" · Supervisor "+esc(h.lider):""}</div><b>${esc(h.pregunta)}</b><br>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:""}`;
   hidratar($("#dlgPreg")); DLG_EV=(h.evidCierre||[]).slice(); pintarEvidDlg();
   $("#dEstado").value=h.estado; $("#dResp").value=h.responsable; $("#dPlazo").value=h.plazo;
   $("#dCierre").value=h.cierre; $("#dFechaCierre").value=h.fechaCierre; $("#dErr").style.display="none";
+  // Sin clave: la desviación, el responsable y el plazo no se editan; solo se puede cerrar un hallazgo PENDIENTE.
+  $("#dResp").disabled = $("#dPlazo").disabled = !ADMIN;
+  ["#dEstado","#dCierre","#dFechaCierre"].forEach(s=>$(s).disabled=soloVer);
+  $("#dFile").closest("label").style.display = soloVer ? "none" : "";
+  $("#dGuardar").style.display = soloVer ? "none" : "";
+  DLG_SOLO = soloVer; pintarEvidDlg();
   $("#dlg").showModal();
 });
 $("#dEstado").addEventListener("change",()=>{ if($("#dEstado").value==="CERRADO" && !$("#dFechaCierre").value) $("#dFechaCierre").value=hoy(); });
 $("#dGuardar").addEventListener("click", e=>{
   if($("#dEstado").value==="CERRADO" && !$("#dCierre").value.trim()){ e.preventDefault(); $("#dErr").style.display="block"; return; }
   const h=DB.hallazgos.find(x=>x.id===editId);
-  h.estado=$("#dEstado").value; h.responsable=$("#dResp").value.trim(); h.plazo=$("#dPlazo").value;
+  if(DLG_SOLO){ e.preventDefault(); return; }
+  h.estado=$("#dEstado").value;
+  if(ADMIN){ h.responsable=$("#dResp").value.trim(); h.plazo=$("#dPlazo").value; }
   h.evidCierre=DLG_EV.slice();
   h.cierre=$("#dCierre").value.trim(); h.fechaCierre = h.estado==="CERRADO" ? ($("#dFechaCierre").value||hoy()) : "";
   guardar(); (h.evidCierre||[]).forEach(v=>encolar("evidencia",v.id)); encolar("hallazgo",h.id); sincronizar();
