@@ -125,6 +125,7 @@
   .pct{font-weight:700} .pct.b{color:var(--verde)} .pct.m{color:var(--naranjo-osc)} .pct.r{color:var(--rojo)}
   details.insp-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc);margin:4px 0 10px}
   body:not(.admin) .solo-admin{display:none}
+  .dias{font-size:12px;font-weight:700;margin-top:3px;white-space:nowrap}.dias.ok{color:var(--verde)}.dias.pronto{color:var(--naranjo-osc)}.dias.tarde{color:var(--rojo)}
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -403,7 +404,7 @@ const CONFIG = {
 const KEY = "rentamaq_verificacion_v1";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const hoy = () => new Date().toISOString().slice(0,10);
+const hoy = () => { const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
 const fmt = d => d ? d.split("-").reverse().join("-") : "";
 
 let DB = {registros:[], hallazgos:[], seq:0};
@@ -808,6 +809,17 @@ function renderHall(){
     (!ft||[h.pregunta,h.comentario,h.responsable,h.area,h.lider,h.id].join(" ").toLowerCase().includes(ft)))
     .sort((a,b)=>(a.estado===b.estado?0:a.estado==="PENDIENTE"?-1:1)||b.id.localeCompare(a.id));
   const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
+  const dif = (a,b) => Math.round((Date.parse(a+"T12:00:00")-Date.parse(b+"T12:00:00"))/864e5);
+  const pl = n => n+" día"+(n===1?"":"s");
+  const diasPlazo = h => {
+    if(!h.plazo || !/^\d{4}-\d{2}-\d{2}$/.test(h.plazo)) return "";
+    if(h.estado==="CERRADO"){ if(!h.fechaCierre) return ""; const d=dif(h.fechaCierre,h.plazo);
+      return d>0 ? `<div class="dias tarde">Cerrado con ${pl(d)} de atraso</div>` : `<div class="dias ok">Cerrado dentro del plazo</div>`; }
+    const d=dif(h.plazo,hoy());
+    if(d>0) return `<div class="dias ${d<=3?"pronto":"ok"}">${d===1?"Queda":"Quedan"} ${pl(d)}</div>`;
+    if(d===0) return `<div class="dias pronto">Vence hoy</div>`;
+    return `<div class="dias tarde">⚠ Vencido hace ${pl(-d)}</div>`;
+  };
   $("#tbHall").innerHTML = L.length ? L.map(h=>`<tr>
     <td style="white-space:nowrap"><b>${esc(h.id)}</b></td><td style="white-space:nowrap">${fmt(h.fecha)}</td>
     <td><b>${esc(h.verificador)||"—"}</b></td>
@@ -816,7 +828,7 @@ function renderHall(){
     <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
     <td class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</td>
     <td>${esc(h.responsable)||'<span class="nota">—</span>'}</td>
-    <td${vencido(h)?' style="color:var(--rojo);font-weight:700" title="Plazo vencido"':""}>${fmt(h.plazo)||'<span class="nota">—</span>'}</td>
+    <td style="white-space:nowrap${vencido(h)?";color:var(--rojo);font-weight:700":""}">${fmt(h.plazo)||'<span class="nota">—</span>'}${diasPlazo(h)}</td>
     <td><span class="estado ${h.estado}">${h.estado}</span>${h.fechaCierre?`<br><span class="nota">${fmt(h.fechaCierre)}</span>`:""}</td>
     <td style="white-space:nowrap"><button class="btn sec peq" data-edit="${esc(h.id)}">${ADMIN?"Editar":h.estado==="PENDIENTE"?"Cerrar":"Ver"}</button>
       <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`).join("")
