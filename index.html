@@ -147,6 +147,9 @@
   .grp-lnk{color:var(--gris)}
   .chip-insp{background:var(--naranjo-claro);border:1px solid var(--naranjo);border-radius:8px;padding:8px 12px;margin:0 0 10px;font-size:14px}
   .chip-insp .lnk{margin-left:8px}
+  .otro{border:1px solid var(--borde);border-left:4px solid var(--naranjo);border-radius:8px;padding:12px;margin:0 0 12px;position:relative}
+  .otro .o-quitar{position:absolute;top:8px;right:8px;background:none;border:0;color:var(--rojo);font-size:13px;font-weight:700;cursor:pointer}
+  .otro.error{border-color:var(--rojo);background:var(--rojo-claro)}
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -196,6 +199,12 @@
         </div>
       </div>
       <div id="secciones"></div>
+      <div class="card seccion" id="otrosCard">
+        <h2>Otros hallazgos</h2>
+        <p class="nota" style="margin:-4px 0 10px">Desviaciones que no están en las preguntas anteriores. Opcional: cada una se registra como hallazgo PENDIENTE a nombre de quien inspecciona.</p>
+        <div id="otrosLista"></div>
+        <button type="button" class="btn sec" id="btnOtro">＋ Agregar otro hallazgo</button>
+      </div>
       <div class="card">
         <label class="campo">Observaciones generales
           <textarea id="obsGeneral" placeholder="Notas de quien inspecciona (opcional)"></textarea>
@@ -509,7 +518,7 @@ document.addEventListener("click", e=>{
   const x=e.target.closest("[data-del]");
   if(x){ e.preventDefault(); e.stopPropagation(); const id=x.dataset.del, ctx=x.dataset.ctx;
     if(ctx==="dlg"){ DLG_EV=DLG_EV.filter(v=>v.id!==id); pintarEvidDlg(); }
-    else { const q=ctx.slice(2); PEND[q]=(PEND[q]||[]).filter(v=>v.id!==id); pintarEvidPreg(document.querySelector(`.preg[data-id="${q}"]`)); IDB.del(id); }
+    else { const q=ctx.slice(2); PEND[q]=(PEND[q]||[]).filter(v=>v.id!==id); const bx=document.querySelector(`[data-id="${q}"]`); if(bx) pintarEvidPreg(bx); IDB.del(id); }
     return; }
   const ev=e.target.closest(".evid"); if(ev){ e.preventDefault(); verEvid(ev.dataset.ev); return; }
   const tc=e.target.closest(".t-com");
@@ -523,7 +532,7 @@ document.addEventListener("change", async e=>{
   toast("Procesando evidencia…");
   const refs=(await Promise.all(files.map(procesarArchivo))).filter(Boolean);
   if(e.target.id==="dFile"){ DLG_EV.push(...refs); pintarEvidDlg(); }
-  else { const box=e.target.closest(".preg"); (PEND[box.dataset.id] ||= []).push(...refs); pintarEvidPreg(box); }
+  else { const box=e.target.closest(".preg,.otro"); (PEND[box.dataset.id] ||= []).push(...refs); pintarEvidPreg(box); }
   toast(`${refs.length} evidencia(s) adjuntada(s).`);
 });
 
@@ -680,6 +689,47 @@ document.addEventListener("change", e=>{
   box.classList.remove("error");
 });
 
+/* ---------- otros hallazgos (fuera de las preguntas) ---------- */
+const OTRAS_CAT=["Personas","Equipos","Entorno","HCR","PTS","Acciones Correctivas"];
+let NOTRO=0;
+function agregarOtro(){
+  const id="o"+(++NOTRO), d=document.createElement("div");
+  d.className="otro"; d.dataset.id=id;
+  d.innerHTML=`<button type="button" class="o-quitar" title="Quitar">✕ Quitar</button>
+    <div class="grid">
+      <label class="campo">Tipo de hallazgo
+        <select class="o-cat"><option value="">Seleccione…</option>${OTRAS_CAT.map(c=>`<option>${c}</option>`).join("")}</select></label>
+      <label class="campo">Prioridad<select class="o-prio"><option>Alta</option><option>Crítica</option><option>Mejora</option></select></label>
+      <label class="campo">Plazo<input type="date" class="o-plazo"></label>
+    </div>
+    <label class="campo" style="margin-top:8px">Descripción del hallazgo<textarea class="o-txt" placeholder="Qué se observó, dónde y qué medida se tomó o se debe tomar…"></textarea></label>
+    <div class="herr"><label class="tool">📎 Adjuntar fotos <span class="cnt" hidden></span><input type="file" class="c-file" accept="image/*,application/pdf" multiple hidden></label></div>
+    <div class="evids"></div><div class="error-msg"></div>`;
+  $("#otrosLista").appendChild(d); return d;
+}
+$("#otrosLista").addEventListener("input", e=>{ const b=e.target.closest(".otro"); if(b){ b.classList.remove("error"); b.querySelector(".error-msg").textContent=""; } });
+function reiniciarOtros(){ $("#otrosLista").innerHTML=""; agregarOtro(); }
+$("#btnOtro").onclick=()=>{ agregarOtro().querySelector(".o-cat").focus(); };
+$("#otrosLista").addEventListener("click", e=>{
+  const b=e.target.closest(".o-quitar"); if(!b) return;
+  const box=b.closest(".otro"), q=box.dataset.id;
+  (PEND[q]||[]).forEach(v=>IDB.del(v.id)); delete PEND[q]; box.remove();
+  if(!$("#otrosLista").children.length) agregarOtro();
+});
+function leerOtros(){
+  let err=null; const L=[];
+  document.querySelectorAll("#otrosLista .otro").forEach(box=>{
+    const cat=box.querySelector(".o-cat").value, txt=box.querySelector(".o-txt").value.trim(), ev=(PEND[box.dataset.id]||[]).slice();
+    let msg="";
+    if(!cat && !txt && !ev.length){ box.classList.remove("error"); box.querySelector(".error-msg").textContent=""; return; }
+    if(!cat) msg="Seleccione el tipo de hallazgo."; else if(!txt) msg="Escriba la descripción del hallazgo.";
+    box.querySelector(".error-msg").textContent=msg; box.classList.toggle("error",!!msg);
+    if(msg){ err=err||box; return; }
+    L.push({categoria:cat, descripcion:txt, prioridad:box.querySelector(".o-prio").value, plazo:box.querySelector(".o-plazo").value, evid:ev});
+  });
+  return {L, err};
+}
+
 /* ---------- enviar ---------- */
 $("#form").addEventListener("submit", e=>{
   e.preventDefault();
@@ -707,10 +757,11 @@ $("#form").addEventListener("submit", e=>{
       seccion: box.closest(".seccion").querySelector("h2").textContent,
       evid: (PEND[box.dataset.id]||[]).slice()});
   });
+  const OT=leerOtros(); if(!primerError && OT.err) primerError=OT.err;
   if(primerError){ primerError.scrollIntoView({behavior:"smooth",block:"center"}); toast("Faltan campos obligatorios."); return; }
 
   const regId = "R-"+DISP+"-"+Date.now().toString(36).toUpperCase();
-  DB.registros.push({id:regId, creado:new Date().toISOString(), datos, respuestas, obs:$("#obsGeneral").value.trim()});
+  DB.registros.push({id:regId, creado:new Date().toISOString(), datos, respuestas, otros:OT.L, obs:$("#obsGeneral").value.trim()});
   let nuevos=0;
   respuestas.filter(r=>r.valor==="NO").forEach(r=>{
     DB.seq=(DB.seq||0)+1; nuevos++;
@@ -719,8 +770,15 @@ $("#form").addEventListener("submit", e=>{
       pregunta:r.pregunta, comentario:r.comentario, prioridad:r.prioridad, responsable:datos.verificador,
       plazo:r.plazo, estado:"PENDIENTE", cierre:"", fechaCierre:"", evid:r.evid, evidCierre:[]});
   });
+  OT.L.forEach(o=>{
+    DB.seq=(DB.seq||0)+1; nuevos++;
+    DB.hallazgos.push({id:"H-"+DISP+"-"+String(DB.seq).padStart(4,"0"), registro:regId, fecha:datos.fecha,
+      area:datos.area, lider:datos.lider, verificador:datos.verificador,
+      pregunta:"Otro hallazgo · "+o.categoria, comentario:o.descripcion, prioridad:o.prioridad, responsable:datos.verificador,
+      plazo:o.plazo, estado:"PENDIENTE", cierre:"", fechaCierre:"", evid:o.evid, evidCierre:[]});
+  });
   guardar();
-  respuestas.forEach(r=>(r.evid||[]).forEach(v=>encolar("evidencia",v.id)));
+  respuestas.concat(OT.L).forEach(r=>(r.evid||[]).forEach(v=>encolar("evidencia",v.id)));
   encolar("registro",regId);
   DB.hallazgos.filter(h=>h.registro===regId).forEach(h=>encolar("hallazgo",h.id));
   sincronizar();
@@ -735,6 +793,7 @@ function limpiar(){
   document.querySelectorAll(".preg").forEach(b=>{ b.classList.remove("error","esno"); b.querySelector(".coment").classList.remove("ver");
     b.querySelector(".c-com").classList.remove("ver"); b.querySelector(".t-com").classList.remove("on");
     b.querySelectorAll(".sel").forEach(l=>l.classList.remove("sel")); pintarEvidPreg(b); });
+  reiniciarOtros();
   document.querySelectorAll("#datosGenerales input,#datosGenerales select").forEach(el=>el.style.borderColor="");
 }
 $("#btnLimpiar").onclick=()=>{ if(confirm("¿Limpiar todas las respuestas y evidencias del formulario?")){ Object.values(PEND).flat().forEach(v=>IDB.del(v.id)); PEND={}; limpiar(); } };
@@ -911,6 +970,7 @@ async function verReporte(id){
       return h+`<div class="det-preg">${x.n}. ${esc(x.pregunta)} <span class="resp ${x.valor||"SR"}">${et[x.valor]||"Sin respuesta"}</span>
         ${x.comentario?`<div class="nota" style="margin-top:4px">💬 ${esc(x.comentario)}</div>`:""}
         ${(x.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(x.evid,{sm:1})}</div>`:""}</div>`; }).join("")
+      + ((r.otros||[]).length?`<div class="det-sec">Otros hallazgos</div>`+r.otros.map(o=>`<div class="det-preg"><b>${esc(o.categoria)}</b> · ${esc(o.descripcion)}${(o.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(o.evid,{sm:1})}</div>`:""}</div>`).join(""):"")
       + (r.obs?`<div class="det-sec">Observaciones generales</div><div>${esc(r.obs)}</div>`:"") + hallDeInsp(id);
     hidratar($("#detBody")); $("#dlgDet").showModal(); return;
   }
@@ -1101,7 +1161,7 @@ $("#cfgUrl").value = urlScript();
 $("#syncPill").onclick = ()=>{ toast($("#syncTxt").textContent); ciclo(); };
 $("#btnRecargar").onclick = async ()=>{
   // Si hay un formulario a medio llenar, se avisa antes de recargar (lo escrito se perdería).
-  const enCurso = $("#g_verificador").value.trim() || $("#g_lider").value.trim() || document.querySelector("#form input[type=radio]:checked") || Object.keys(PEND||{}).length;
+  const enCurso = $("#g_verificador").value.trim() || $("#g_lider").value.trim() || document.querySelector("#form input[type=radio]:checked") || [...document.querySelectorAll(".o-txt")].some(x=>x.value.trim()) || Object.keys(PEND||{}).length;
   if(enCurso && !confirm("Tienes un formulario sin enviar. Si actualizas la página se perderá lo que escribiste.\n\n¿Actualizar de todos modos?")) return;
   $("#btnRecargar").textContent="↻ Actualizando…";
   try{ await Promise.race([ciclo(), new Promise(r=>setTimeout(r,8000))]); }catch(e){}
@@ -1125,7 +1185,7 @@ $("#btnReenviar").onclick = ()=>{
 };
 
 if(ADMIN) document.body.classList.add("admin");
-cargar(); construir(); render(); pintarSync(); pintarActualiz(); ciclo();
+cargar(); construir(); reiniciarOtros(); render(); pintarSync(); pintarActualiz(); ciclo();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
