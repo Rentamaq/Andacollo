@@ -136,6 +136,12 @@
   .info-b.rojo{background:var(--rojo-claro);border-color:var(--rojo)}.info-b.rojo b{color:var(--rojo)}
   .info-b.nar{background:var(--naranjo-claro);border-color:var(--naranjo)}.info-b.nar b{color:var(--naranjo-osc)}
   .info-b.gris{background:#F1F1F1;border-color:#8A8A8A}
+  .lnk{background:none;border:0;padding:0;font:inherit;color:var(--naranjo-osc);font-weight:700;cursor:pointer;text-align:left}
+  .lnk:hover{text-decoration:underline}
+  tr.grp td{background:var(--gris-claro);border-top:2px solid var(--naranjo);padding:9px 10px}
+  .grp-lnk{color:var(--gris)}
+  .chip-insp{background:var(--naranjo-claro);border:1px solid var(--naranjo);border-radius:8px;padding:8px 12px;margin:0 0 10px;font-size:14px}
+  .chip-insp .lnk{margin-left:8px}
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -216,7 +222,7 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Supervisor evaluado</th><th>Área / Lugar</th><th>Inspeccionado por</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th>Hallazgos</th><th class="solo-admin"></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Supervisor evaluado</th><th>Área / Lugar</th><th>Inspeccionado por</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th>Hallazgos</th><th>Reporte</th><th class="solo-admin"></th></tr></thead>
           <tbody id="tbInsp"></tbody>
         </table>
       </div>
@@ -243,7 +249,8 @@
         <button class="btn sec" id="btnTraer" type="button">↻ Actualizar</button>
         <button class="btn sec" id="btnCsv" type="button">Exportar a Excel (CSV)</button>
       </div>
-      <div class="tabla-wrap">
+      <div class="chip-insp" id="chipInsp" style="display:none"></div>
+      <div class="tabla-wrap" id="tablaHall">
         <table>
           <thead><tr><th>N°</th><th>Fecha</th><th>Levantado por</th><th>Área / Lugar</th><th>Pregunta (desviación)</th><th>Comentario</th><th>Prioridad</th><th>Responsable</th><th>Plazo</th><th>Estado</th><th></th></tr></thead>
           <tbody id="tbHall"></tbody>
@@ -772,12 +779,13 @@ function renderInsp(){
   $("#iPct").textContent=pcts.length? Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%" : "—";
   const cls=p=>p>=.9?"b":p>=.7?"m":"r";
   $("#tbInsp").innerHTML = L.length ? L.map(x=>{ const p=(x.pct===null||x.pct===""||isNaN(x.pct))?null:+x.pct; const nh=Math.max(x.hall, 0);
-    return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td>${esc(x.area)}</td><td>${esc(x.verificador)}</td>
+    return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td><button class="lnk" type="button" data-rep="${esc(x.id)}">${esc(x.area)||"Ver"} ›</button></td><td>${esc(x.verificador)}</td>
       <td style="color:var(--verde);font-weight:700">${x.si}</td><td style="color:var(--rojo);font-weight:700">${x.no}</td><td>${x.na}</td>
       <td>${p===null?"—":`<span class="pct ${cls(p)}">${Math.round(p*100)}%</span>`}</td>
-      <td>${(nh||+x.no)?`<span class="estado PENDIENTE">${nh||x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td>
+      <td>${nh?`<button class="lnk" type="button" data-ir-hall="${esc(x.id)}" title="Ir a los hallazgos de esta inspección"><span class="estado PENDIENTE">${nh}</span> Ver ›</button>`:+x.no?`<span class="estado PENDIENTE">${x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td>
+      <td><button class="btn sec peq" type="button" data-rep="${esc(x.id)}">📄 Ver</button></td>
       <td class="solo-admin" style="white-space:nowrap"><button class="btn sec peq" type="button" data-edit-insp="${esc(x.id)}" title="Editar inspección">✏️</button> <button class="btn-del" type="button" data-del-insp="${esc(x.id)}" title="Eliminar inspección">🗑</button></td></tr>`; }).join("")
-    : `<tr><td colspan="10" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
+    : `<tr><td colspan="11" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
 }
 /* ---------- eliminar inspecciones (solo administrador) ---------- */
 function quitarLocal(ids){
@@ -820,6 +828,18 @@ $("#tbInsp").addEventListener("click", e=>{
   toast("Inspección eliminada.");
 });
 ["#iArea","#iDesde","#iHasta","#iTexto"].forEach(s=>$(s).addEventListener("input", renderInsp));
+const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
+const dif = (a,b) => Math.round((Date.parse(a+"T12:00:00")-Date.parse(b+"T12:00:00"))/864e5);
+const pl = n => n+" día"+(n===1?"":"s");
+const diasPlazo = h => {
+  if(!h.plazo || !/^\d{4}-\d{2}-\d{2}$/.test(h.plazo)) return "";
+  if(h.estado==="CERRADO"){ if(!h.fechaCierre) return ""; const d=dif(h.fechaCierre,h.plazo);
+    return d>0 ? `<div class="dias tarde">Cerrado con ${pl(d)} de atraso</div>` : `<div class="dias ok">Cerrado dentro del plazo</div>`; }
+  const d=dif(h.plazo,hoy());
+  if(d>0) return `<div class="dias ${d<=3?"pronto":"ok"}">${d===1?"Queda":"Quedan"} ${pl(d)}</div>`;
+  if(d===0) return `<div class="dias pronto">Vence hoy</div>`;
+  return `<div class="dias tarde">⚠ Vencido hace ${pl(-d)}</div>`;
+};
 function renderHall(){
   renderInsp();
   const H=DB.hallazgos, fe=$("#fEstado").value, fp=$("#fPrio").value, ft=$("#fTexto").value.toLowerCase();
@@ -827,25 +847,19 @@ function renderHall(){
   $("#kTotal").textContent=H.length; $("#kPend").textContent=pend.length;
   $("#kCerr").textContent=H.length-pend.length; $("#kCrit").textContent=pend.filter(h=>h.prioridad==="Crítica").length;
   $("#badgePend").textContent=pend.length;
-  const L=H.filter(h=>(!fe||h.estado===fe)&&(!fp||h.prioridad===fp)&&
+  const L=H.filter(h=>(!FILTRO_INSP||h.registro===FILTRO_INSP)&&(!fe||h.estado===fe)&&(!fp||h.prioridad===fp)&&
     (!ft||[h.pregunta,h.comentario,h.responsable,h.area,h.lider,h.id].join(" ").toLowerCase().includes(ft)))
     .sort((a,b)=>(a.estado===b.estado?0:a.estado==="PENDIENTE"?-1:1)||b.id.localeCompare(a.id));
-  const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
-  const dif = (a,b) => Math.round((Date.parse(a+"T12:00:00")-Date.parse(b+"T12:00:00"))/864e5);
-  const pl = n => n+" día"+(n===1?"":"s");
-  const diasPlazo = h => {
-    if(!h.plazo || !/^\d{4}-\d{2}-\d{2}$/.test(h.plazo)) return "";
-    if(h.estado==="CERRADO"){ if(!h.fechaCierre) return ""; const d=dif(h.fechaCierre,h.plazo);
-      return d>0 ? `<div class="dias tarde">Cerrado con ${pl(d)} de atraso</div>` : `<div class="dias ok">Cerrado dentro del plazo</div>`; }
-    const d=dif(h.plazo,hoy());
-    if(d>0) return `<div class="dias ${d<=3?"pronto":"ok"}">${d===1?"Queda":"Quedan"} ${pl(d)}</div>`;
-    if(d===0) return `<div class="dias pronto">Vence hoy</div>`;
-    return `<div class="dias tarde">⚠ Vencido hace ${pl(-d)}</div>`;
-  };
-  $("#tbHall").innerHTML = L.length ? L.map(h=>`<tr>
+  const chip=$("#chipInsp");
+  if(FILTRO_INSP){ const i=infoInsp(FILTRO_INSP); chip.style.display=""; chip.innerHTML=`Mostrando solo los hallazgos de la inspección del <b>${fmt(i.fecha)}</b> · ${esc(i.area)} · ${esc(i.verificador)} <button class="lnk" type="button" id="btnQuitarInsp">✕ Ver todos</button>`; }
+  else chip.style.display="none";
+  const grupos=new Map(); L.forEach(h=>{ const k=h.registro||h.id; if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(h); });
+  const G=[...grupos.entries()].sort((a,b)=>{ const pa=a[1].some(h=>h.estado==="PENDIENTE"), pb=b[1].some(h=>h.estado==="PENDIENTE");
+    return (pa===pb?0:pa?-1:1) || String(b[1][0].fecha).localeCompare(String(a[1][0].fecha)) || String(b[0]).localeCompare(String(a[0])); });
+  const filaH = h=>`<tr>
     <td style="white-space:nowrap"><b>${esc(h.id)}</b></td><td style="white-space:nowrap">${fmt(h.fecha)}</td>
     <td><b>${esc(h.verificador)||"—"}</b></td>
-    <td>${esc(h.area)}${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
+    <td><button class="lnk" type="button" data-rep="${esc(h.registro)}" title="Abrir el reporte de la inspección">${esc(h.area)||"Ver"} ›</button>${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
     <td>${esc(h.pregunta)}</td>
     <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
     <td class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</td>
@@ -853,10 +867,65 @@ function renderHall(){
     <td style="white-space:nowrap${vencido(h)?";color:var(--rojo);font-weight:700":""}">${fmt(h.plazo)||'<span class="nota">—</span>'}${diasPlazo(h)}</td>
     <td><span class="estado ${h.estado}">${h.estado}</span>${h.fechaCierre?`<br><span class="nota">${fmt(h.fechaCierre)}</span>`:""}</td>
     <td style="white-space:nowrap"><button class="btn sec peq" data-edit="${esc(h.id)}">${ADMIN?"Editar":h.estado==="PENDIENTE"?"Cerrar":"Ver"}</button>
-      <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`).join("")
+      <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`;
+  $("#tbHall").innerHTML = G.length ? G.map(([k,hs])=>{ const i=infoInsp(k), np=hs.filter(h=>h.estado==="PENDIENTE").length;
+    return `<tr class="grp"><td colspan="11"><button class="lnk grp-lnk" type="button" data-rep="${esc(k)}">📋 Inspección del ${fmt(i.fecha)} · ${esc(i.area)} · Supervisor ${esc(i.lider)||"—"} · Inspeccionado por ${esc(i.verificador)||"—"}</button>
+      <span class="nota"> · ${hs.length} hallazgo${hs.length===1?"":"s"}${np?` · <b style="color:var(--naranjo-osc)">${np} pendiente${np===1?"":"s"}</b>`:""}</span>
+      <button class="btn sec peq" type="button" data-rep="${esc(k)}" style="float:right">📄 Ver reporte y evidencias</button></td></tr>`+hs.map(filaH).join(""); }).join("")
     : `<tr><td colspan="11" class="vacio">No hay hallazgos${H.length?" con esos filtros":". Se crean automáticamente cuando una respuesta es NO"}.</td></tr>`;
   hidratar($("#tbHall"));
 }
+/* ---------- reporte completo de una inspección ---------- */
+let FILTRO_INSP="";
+function infoInsp(id){
+  const x=listaInspecciones().find(i=>i.id===id); if(x) return x;
+  const h=DB.hallazgos.find(h=>h.registro===id)||{}; return {id, fecha:h.fecha, area:h.area, verificador:h.verificador, lider:h.lider};
+}
+function hallDeInsp(id){
+  const hs=DB.hallazgos.filter(h=>h.registro===id); if(!hs.length) return "";
+  return `<div class="det-sec">Hallazgos de esta inspección (${hs.length})</div>`+hs.map(h=>`<div class="det-preg">
+    <b>${esc(h.id)}</b> · ${esc(h.pregunta)} <span class="estado ${h.estado}">${h.estado}</span>
+    <div class="nota" style="margin-top:4px">💬 ${esc(h.comentario)}</div>
+    <div class="nota">Prioridad <b class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</b> · Responsable <b>${esc(h.responsable)||"—"}</b> · Plazo <b>${fmt(h.plazo)||"—"}</b></div>${diasPlazo(h)}
+    ${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}
+    ${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre (${fmt(h.fechaCierre)}):</b> ${esc(h.cierre)}</div>`:""}
+    ${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</div>`).join("");
+}
+async function verReporte(id){
+  if(!id) return;
+  const i=infoInsp(id), et={SI:"SÍ",NO:"NO",NA:"N/A"}, cl={"SÍ":"SI","NO":"NO","N/A":"NA"};
+  $("#detTit").textContent=`Reporte de inspección · ${fmt(i.fecha)} · ${i.area||""}`;
+  const cab = d=>CONFIG.datosGenerales.map(c=>`<div><b>${esc(c.label)}:</b> ${esc(c.tipo==="date"?fmt(d[c.id]):d[c.id])}</div>`).join("");
+  const r=DB.registros.find(x=>x.id===id); let sec="";
+  if(r){
+    $("#detBody").innerHTML = cab(r.datos) + r.respuestas.map(x=>{ const h = x.seccion && x.seccion!==sec ? `<div class="det-sec">${esc(sec=x.seccion)}</div>` : "";
+      return h+`<div class="det-preg">${x.n}. ${esc(x.pregunta)} <span class="resp ${x.valor||"SR"}">${et[x.valor]||"Sin respuesta"}</span>
+        ${x.comentario?`<div class="nota" style="margin-top:4px">💬 ${esc(x.comentario)}</div>`:""}
+        ${(x.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(x.evid,{sm:1})}</div>`:""}</div>`; }).join("")
+      + (r.obs?`<div class="det-sec">Observaciones generales</div><div>${esc(r.obs)}</div>`:"") + hallDeInsp(id);
+    hidratar($("#detBody")); $("#dlgDet").showModal(); return;
+  }
+  $("#detBody").innerHTML = cab(i) + `<div class="nota" style="margin:14px 0">⏳ Cargando el reporte desde la planilla…</div>` + hallDeInsp(id);
+  hidratar($("#detBody")); if(!$("#dlgDet").open) $("#dlgDet").showModal();
+  let d=null, err="";
+  if(!navigator.onLine || !urlScript()) err="Sin señal: el reporte completo se puede ver cuando haya conexión.";
+  else { try{ d=await jsonp(urlScript()+"?accion=reporte&id="+encodeURIComponent(id)); }catch(e){ err="No se pudo leer la planilla ("+e.message+")."; } }
+  if(d && !d.ok) err = d.error==="Tipo desconocido"||!d.error ? "El servicio de Drive aún no tiene esta función: hay que actualizar el Apps Script (Nueva versión)." : d.error;
+  if(d && d.ok && !Array.isArray(d.respuestas)) { err="El servicio de Drive aún no tiene esta función: hay que actualizar el Apps Script (Nueva versión)."; d=null; }
+  if(err || !d){ $("#detBody").innerHTML = cab(i) + `<div class="error-msg" style="display:block;margin:14px 0">${esc(err||"No se pudo cargar el reporte.")}</div>` + hallDeInsp(id); hidratar($("#detBody")); return; }
+  $("#detBody").innerHTML = cab(d.datos||i) + d.respuestas.map(x=>{ const h = x.seccion && x.seccion!==sec ? `<div class="det-sec">${esc(sec=x.seccion)}</div>` : "";
+      return h+`<div class="det-preg">${esc(x.n)}. ${esc(x.pregunta)} <span class="resp ${cl[x.respuesta]||"SR"}">${esc(x.respuesta||"Sin respuesta")}</span>
+        ${x.comentario?`<div class="nota" style="margin-top:4px">💬 ${esc(x.comentario)}</div>`:""}${enlaces(x.enlaces,"Evidencia")}</div>`; }).join("")
+    + (d.obs?`<div class="det-sec">Observaciones generales</div><div>${esc(d.obs)}</div>`:"") + hallDeInsp(id);
+  hidratar($("#detBody"));
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-rep],[data-ir-hall],#btnQuitarInsp"); if(!b) return;
+  if(b.id==="btnQuitarInsp"){ FILTRO_INSP=""; renderHall(); return; }
+  if(b.dataset.irHall){ FILTRO_INSP=b.dataset.irHall; $("#fEstado").value=""; $("#fPrio").value=""; $("#fTexto").value=""; renderHall();
+    $("#chipInsp").scrollIntoView({behavior:"smooth",block:"start"}); return; }
+  verReporte(b.dataset.rep);
+});
 let editId=null;
 $("#tbHall").addEventListener("click", e=>{
   const del=e.target.dataset.delHall;
