@@ -23,7 +23,11 @@
   .head-tit h1{margin:0;font-size:32px;line-height:1.1;font-weight:800;color:var(--gris);letter-spacing:.3px}
   .head-tit p{margin:4px 0 0;color:var(--naranjo-osc);font-size:15px;font-weight:600}
   @media (max-width:600px){.head-tit h1{font-size:26px}}
-  nav{background:var(--gris)}
+  nav{background:var(--gris);display:flex;align-items:center}
+  nav .tabs{flex:1;min-width:0}
+  .sync-box{display:flex;align-items:center;gap:8px;padding-right:clamp(8px,2.5vw,32px);flex-shrink:0}
+  .sync-box .sync{margin-left:0}
+  @media (max-width:700px){ nav{flex-direction:column;align-items:stretch} .sync-box{justify-content:flex-end;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.12);order:-1} .tabs{width:100%} }
   .tabs{max-width:none;margin:0;display:flex;padding:0 clamp(8px,2.5vw,32px);overflow-x:auto}
   .tab{background:none;border:0;color:#E8E8E8;padding:13px 18px;font-size:15px;font-weight:600;cursor:pointer;border-bottom:4px solid transparent;white-space:nowrap}
   .tab:hover{color:#fff}
@@ -114,6 +118,7 @@
   .resp.SI{background:var(--verde-claro);color:var(--verde)} .resp.NO{background:var(--rojo-claro);color:var(--rojo)} .resp.NA,.resp.SR{background:var(--gris-claro);color:var(--gris-2)}
   #visor img{max-width:100%;max-height:70vh;display:block;margin:0 auto}
   .sync{margin-left:auto;align-self:center;display:flex;align-items:center;gap:6px;color:#fff;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.1);border-radius:14px;padding:4px 12px;cursor:pointer;white-space:nowrap;border:0;font-family:inherit}
+  .sync.recargar{background:#E88305}.sync.recargar:hover{background:#C76E00}
   .sync .dot{width:9px;height:9px;border-radius:50%;background:#9E9E9E}
   .sync.ok .dot{background:#4CAF50} .sync.pend .dot{background:var(--naranjo)} .sync.off .dot{background:#E53935} .sync.run .dot{background:#FFC107;animation:pl 1s infinite}
   @keyframes pl{50%{opacity:.3}}
@@ -162,7 +167,10 @@
     <button class="tab activa" data-vista="v-form">Formulario</button>
     <button class="tab" data-vista="v-seg">Seguimiento de hallazgos <span class="badge" id="badgePend">0</span></button>
     <button class="tab" data-vista="v-reg">🔒 Registros</button>
+  </div>
+  <div class="sync-box">
     <button class="sync" id="syncPill" type="button" title="Estado de envío a Google Drive"><span class="dot"></span><span id="syncTxt">…</span></button>
+    <button class="sync recargar" id="btnRecargar" type="button" title="Actualizar la página (trae la última versión y los datos de todos los equipos)">↻ Actualizar</button>
   </div>
 </nav>
 
@@ -1091,6 +1099,15 @@ $("#fileRestore").onchange=e=>{
 
 $("#cfgUrl").value = urlScript();
 $("#syncPill").onclick = ()=>{ toast($("#syncTxt").textContent); ciclo(); };
+$("#btnRecargar").onclick = async ()=>{
+  // Si hay un formulario a medio llenar, se avisa antes de recargar (lo escrito se perdería).
+  const enCurso = $("#g_verificador").value.trim() || $("#g_lider").value.trim() || document.querySelector("#form input[type=radio]:checked") || Object.keys(PEND||{}).length;
+  if(enCurso && !confirm("Tienes un formulario sin enviar. Si actualizas la página se perderá lo que escribiste.\n\n¿Actualizar de todos modos?")) return;
+  $("#btnRecargar").textContent="↻ Actualizando…";
+  try{ await Promise.race([ciclo(), new Promise(r=>setTimeout(r,8000))]); }catch(e){}
+  try{ const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if(reg) await reg.update(); }catch(e){}
+  location.reload();
+};
 $("#btnTraer").onclick = ()=>{ if(!navigator.onLine){ toast("Sin señal. Se actualizará al volver la conexión."); return; } toast("Actualizando hallazgos…"); traerHallazgos(); };
 $("#btnCfgGuardar").onclick = async ()=>{
   const u=$("#cfgUrl").value.trim();
