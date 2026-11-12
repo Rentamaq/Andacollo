@@ -248,6 +248,7 @@
         </label>
         <button class="btn sec" id="btnTraer" type="button">↻ Actualizar</button>
         <button class="btn sec" id="btnCsv" type="button">Exportar a Excel (CSV)</button>
+        <button class="btn" id="btnPdf" type="button">📄 Informe PDF</button>
       </div>
       <div class="chip-insp" id="chipInsp" style="display:none"></div>
       <div class="tabla-wrap" id="tablaHall">
@@ -925,6 +926,73 @@ document.addEventListener("click", e=>{
   if(b.dataset.irHall){ FILTRO_INSP=b.dataset.irHall; $("#fEstado").value=""; $("#fPrio").value=""; $("#fTexto").value=""; renderHall();
     $("#chipInsp").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   verReporte(b.dataset.rep);
+});
+/* ---------- informe PDF de pendientes por persona ---------- */
+function informeHTML(){
+  const H=DB.hallazgos, HOY=hoy(), pl=n=>n+" día"+(n===1?"":"s");
+  const ndias=p=>dif(p,HOY);
+  const sit=p=>{ if(!/^\d{4}-\d{2}-\d{2}$/.test(p||"")) return '<span class="sm">Sin plazo</span>'; const n=ndias(p);
+    return n<0?`<span class="r">Vencido hace ${pl(-n)}</span>`:n===0?'<span class="o">Vence hoy</span>':`<span class="${n<=3?"o":"g"}">${n===1?"Queda":"Quedan"} ${pl(n)}</span>`; };
+  const key=s=>String(s||"").trim().toLowerCase()||"(sin nombre)";
+  const P=H.filter(h=>h.estado==="PENDIENTE"), C=H.filter(h=>h.estado==="CERRADO").sort((a,b)=>String(b.fechaCierre).localeCompare(String(a.fechaCierre)));
+  const ord=(a,b)=>String(a.plazo||"9999").localeCompare(String(b.plazo||"9999"));
+  const grupos=new Map(); P.forEach(h=>{ const k=key(h.verificador); if(!grupos.has(k)) grupos.set(k,{nombre:String(h.verificador||"(sin nombre)").trim(),L:[]}); grupos.get(k).L.push(h); });
+  const G=[...grupos.values()].sort((a,b)=>b.L.length-a.L.length||a.nombre.localeCompare(b.nombre));
+  const venc=L=>L.filter(h=>h.plazo&&ndias(h.plazo)<0).length, pronto=L=>L.filter(h=>h.plazo&&ndias(h.plazo)>=0&&ndias(h.plazo)<=2).length;
+  const nInsp=listaInspecciones().length;
+  const res=G.map(g=>{ const m=g.L.slice().sort(ord)[0]; return `<tr><td><b>${esc(g.nombre)}</b></td><td class=c>${g.L.length}</td><td class=c>${venc(g.L)}</td><td class=c>${pronto(g.L)}</td><td>${fmt(m.plazo)||"—"} · ${sit(m.plazo)}</td></tr>`; }).join("");
+  const sups=new Map(); P.forEach(h=>{ const k=key(h.lider)+"|"+h.area; if(!sups.has(k)) sups.set(k,{s:h.lider||"—",a:h.area,L:[]}); sups.get(k).L.push(h); });
+  const supRows=[...sups.values()].sort((a,b)=>b.L.length-a.L.length).map(x=>{ const c=new Map(); x.L.forEach(h=>{const n=String(h.verificador||"").trim(); c.set(n,(c.get(n)||0)+1);});
+    return `<tr><td><b>${esc(x.s)}</b></td><td>${esc(x.a)}</td><td class=c>${x.L.length}</td><td class=c>${venc(x.L)}</td><td>${esc([...c].map(([n,k])=>`${n} (${k})`).join(", "))}</td></tr>`; }).join("");
+  const det=G.map(g=>{ const L=g.L.slice().sort(ord), ins=[...new Set(L.map(h=>`${fmt(h.fecha)} en ${h.area}, supervisor ${h.lider||"—"}`))];
+    return `<div class=persona><h3>${esc(g.nombre)} <span class=badge>${L.length} pendiente${L.length===1?"":"s"}</span></h3><p class=sub>Inspección${ins.length>1?"es":""} del ${esc(ins.join("; "))}.</p>
+    <table><thead><tr><th>N°</th><th>Desviación</th><th>Supervisor</th><th>Prioridad</th><th>Plazo</th><th>Responsable</th></tr></thead><tbody>${L.map(h=>`<tr><td class=id>${esc(h.id)}</td><td><b>${esc(h.pregunta)}</b><div class=det>${esc(h.comentario)}</div></td><td>${esc(h.lider)}</td><td class="pr ${esc(h.prioridad)}">${esc(h.prioridad)}</td><td class=nw>${fmt(h.plazo)||"—"}<br>${sit(h.plazo)}</td><td class=sm>${esc(h.responsable)||"—"}</td></tr>`).join("")}</tbody></table></div>`; }).join("");
+  const cer=C.map(h=>{ const n=(h.plazo&&h.fechaCierre)?dif(h.fechaCierre,h.plazo):null;
+    return `<tr><td class=id>${esc(h.id)}</td><td><b>${esc(h.pregunta)}</b><div class=det>${esc(h.cierre)}</div></td><td>${esc(h.verificador)}</td><td>${esc(h.lider)}</td><td class=nw>${fmt(h.plazo)||"—"}</td><td class=nw>${fmt(h.fechaCierre)}${n===null?"":n>0?`<br><span class=r>${pl(n)} de atraso</span>`:"<br><span class=g>Dentro del plazo</span>"}</td></tr>`; }).join("");
+  const tv=venc(P), tp=pronto(P), ahora=new Date().toLocaleString("es-CL",{dateStyle:"short",timeStyle:"short"});
+  const lead = P.length ? `Quedan <b>${P.length} hallazgo${P.length===1?"":"s"} pendiente${P.length===1?"":"s"}</b>, levantados por ${G.length} persona${G.length===1?"":"s"}. ${tv?`<b class=r>${tv} vencido${tv===1?"":"s"}</b>.`:"Ninguno está vencido."} ${tp?`${tp} vence${tp===1?"":"n"} en 2 días o menos.`:""}` : "No hay hallazgos pendientes.";
+  const logo=(document.querySelector("header img")||{}).src||"";
+  return `<!doctype html><html lang=es><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Hallazgos pendientes por persona ${fmt(HOY)}</title><style>
+@page{size:A4 landscape;margin:12mm}
+body{font-family:Arial,Helvetica,sans-serif;color:#3F3F3F;font-size:10.5pt;margin:0;padding:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{body{padding:0}.noimp{display:none}}
+.noimp{background:#FDF1E2;border:1px solid #E88305;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11pt}
+.noimp button{background:#E88305;color:#fff;border:0;border-radius:6px;padding:8px 16px;font-weight:bold;font-size:11pt;cursor:pointer;margin-right:10px}
+header{display:flex;align-items:center;gap:18px;border-bottom:4px solid #E88305;padding-bottom:10px;margin-bottom:14px;flex-wrap:wrap}
+header img{height:46px} header h1{margin:0;font-size:20pt} header .s{color:#C76E00;font-weight:bold;font-size:11pt} header .f{margin-left:auto;text-align:right;font-size:9.5pt;color:#5E5E5E}
+h2{font-size:13.5pt;margin:18px 0 8px;border-left:5px solid #E88305;padding-left:8px} h3{font-size:12pt;margin:0 0 2px}
+.kpis{display:flex;gap:10px;margin:6px 0 12px;flex-wrap:wrap}.kpi{flex:1;min-width:120px;border:1px solid #D9D9D9;border-left:5px solid #3F3F3F;border-radius:6px;padding:8px 12px}
+.kpi b{font-size:20pt;display:block}.kpi span{font-size:9pt;color:#5E5E5E}.kpi.o{border-left-color:#E88305}.kpi.o b{color:#C76E00}.kpi.r{border-left-color:#C62828}.kpi.r b{color:#C62828}.kpi.g{border-left-color:#2E7D32}.kpi.g b{color:#2E7D32}
+p.lead{font-size:11pt;margin:4px 0 10px}
+table{width:100%;border-collapse:collapse;margin:4px 0 6px}th{background:#3F3F3F;color:#fff;text-align:left;font-size:9pt;padding:6px 7px}
+td{border-bottom:1px solid #D9D9D9;padding:6px 7px;vertical-align:top}tr{page-break-inside:avoid}
+td.c{text-align:center}.id{font-weight:bold;white-space:nowrap;font-size:9.5pt}.nw{white-space:nowrap}.sm{font-size:9pt;color:#5E5E5E}
+.det{font-size:9.5pt;color:#5E5E5E;margin-top:2px}.r{color:#C62828;font-weight:bold}.o{color:#C76E00;font-weight:bold}.g{color:#2E7D32;font-weight:bold}
+.pr.Alta{color:#C76E00;font-weight:bold}.pr.Crítica{color:#C62828;font-weight:bold}.pr.Mejora{color:#2E7D32;font-weight:bold}
+.persona{margin:12px 0 14px;page-break-inside:avoid}.badge{background:#FDF1E2;color:#C76E00;border:1px solid #E88305;border-radius:10px;padding:1px 8px;font-size:9pt;margin-left:6px}
+p.sub{margin:0 0 4px;font-size:9.5pt;color:#5E5E5E}.brk{page-break-before:always}
+footer{margin-top:16px;font-size:8.5pt;color:#8A8A8A;border-top:1px solid #D9D9D9;padding-top:6px}
+</style></head><body>
+<div class=noimp><button onclick="window.print()">🖨 Guardar como PDF</button>En la ventana de impresión elige <b>Guardar como PDF</b> como destino (en iPhone: Compartir › Imprimir, y luego Compartir el PDF).</div>
+<header>${logo?`<img src="${logo}" alt="Renta Maq">`:""}<div><h1>Hallazgos pendientes por persona</h1><div class=s>Liderazgo Visible · Plan de Shock · Teck Carmen de Andacollo</div></div>
+<div class=f>Corte: ${esc(ahora)}<br>Fuente: hallazgos de todos los equipos</div></header>
+<div class=kpis><div class="kpi o"><b>${P.length}</b><span>Hallazgos pendientes</span></div><div class="kpi r"><b>${tv}</b><span>Vencidos</span></div><div class="kpi o"><b>${tp}</b><span>Vencen en 2 días o menos</span></div><div class="kpi g"><b>${C.length}</b><span>Cerrados</span></div><div class=kpi><b>${nInsp}</b><span>Inspecciones realizadas</span></div></div>
+<p class=lead>${lead}</p>
+${P.length?`<h2>Resumen por persona</h2><table><thead><tr><th>Persona que levantó</th><th>Pendientes</th><th>Vencidos</th><th>Vencen en 2 días o menos</th><th>Plazo más próximo</th></tr></thead><tbody>${res}<tr><td><b>Total</b></td><td class=c><b>${P.length}</b></td><td class=c><b>${tv}</b></td><td class=c><b>${tp}</b></td><td></td></tr></tbody></table>
+<h2>Por supervisor evaluado</h2><table><thead><tr><th>Supervisor</th><th>Área</th><th>Pendientes</th><th>Vencidos</th><th>Levantados por</th></tr></thead><tbody>${supRows}</tbody></table>
+<h2 class=brk>Detalle de pendientes por persona</h2><p class=sub>Orden: plazo más próximo primero.</p>${det}`:""}
+${C.length?`<h2>Hallazgos cerrados</h2><table><thead><tr><th>N°</th><th>Desviación / medida aplicada</th><th>Levantado por</th><th>Supervisor</th><th>Plazo</th><th>Cierre</th></tr></thead><tbody>${cer}</tbody></table>`:""}
+<footer>RENTA MAQ · Liderazgo Visible · Informe generado el ${esc(ahora)} · Días contados al ${fmt(HOY)}</footer>
+<script>setTimeout(function(){try{window.print()}catch(e){}},600)<\/script>
+</body></html>`;
+}
+$("#btnPdf").addEventListener("click", async ()=>{
+  const w=window.open("","_blank");   // se abre de inmediato para que el navegador no la bloquee
+  if(w) w.document.write('<p style="font-family:Arial;padding:20px">Preparando informe…</p>');
+  try{ await traerHallazgos(); }catch(e){}
+  const htmlInf=informeHTML();
+  if(w){ w.document.open(); w.document.write(htmlInf); w.document.close(); }
+  else { descargar(`Informe_hallazgos_${hoy()}.html`, htmlInf, "text/html"); toast("Se descargó el informe: ábrelo e imprímelo como PDF."); }
 });
 let editId=null;
 $("#tbHall").addEventListener("click", e=>{
