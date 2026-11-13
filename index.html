@@ -201,7 +201,7 @@
       <div id="secciones"></div>
       <div class="card seccion" id="otrosCard">
         <h2>Otros hallazgos</h2>
-        <p class="nota" style="margin:-4px 0 10px">Desviaciones que no están en las preguntas anteriores. Opcional: cada una se registra como hallazgo PENDIENTE a nombre de quien inspecciona.</p>
+        <p class="nota" style="margin:-4px 0 10px">Desviaciones que no están en las preguntas anteriores. Opcional: se puede dejar en blanco. Lo que se complete se registra como hallazgo PENDIENTE a nombre de quien inspecciona.</p>
         <div id="otrosLista"></div>
         <button type="button" class="btn sec" id="btnOtro">＋ Agregar otro hallazgo</button>
       </div>
@@ -717,17 +717,15 @@ $("#otrosLista").addEventListener("click", e=>{
   if(!$("#otrosLista").children.length) agregarOtro();
 });
 function leerOtros(){
-  let err=null; const L=[];
+  // Sección opcional: nunca bloquea el envío. Se guarda lo que tenga descripción o fotos; sin tipo queda como "Sin tipo".
+  const L=[];
   document.querySelectorAll("#otrosLista .otro").forEach(box=>{
+    box.classList.remove("error"); box.querySelector(".error-msg").textContent="";
     const cat=box.querySelector(".o-cat").value, txt=box.querySelector(".o-txt").value.trim(), ev=(PEND[box.dataset.id]||[]).slice();
-    let msg="";
-    if(!cat && !txt && !ev.length){ box.classList.remove("error"); box.querySelector(".error-msg").textContent=""; return; }
-    if(!cat) msg="Seleccione el tipo de hallazgo."; else if(!txt) msg="Escriba la descripción del hallazgo.";
-    box.querySelector(".error-msg").textContent=msg; box.classList.toggle("error",!!msg);
-    if(msg){ err=err||box; return; }
-    L.push({categoria:cat, descripcion:txt, prioridad:box.querySelector(".o-prio").value, plazo:box.querySelector(".o-plazo").value, evid:ev});
+    if(!txt && !ev.length) return;
+    L.push({categoria:cat||"Sin tipo", descripcion:txt||"(sin descripción)", prioridad:box.querySelector(".o-prio").value, plazo:box.querySelector(".o-plazo").value, evid:ev});
   });
-  return {L, err};
+  return {L, err:null};
 }
 
 /* ---------- enviar ---------- */
