@@ -165,6 +165,20 @@
   .db-vacio{color:var(--gris-2);font-size:14px;padding:10px 0}
   #dbPersona,#dbArea2,#dbSup,#dbTop{overflow-x:auto}
   @media (max-width:700px){ .db-tab .ocultar-m{display:none} .db-tab td.nom{max-width:105px;white-space:normal} .db-bar{min-width:50px} .db-tab th{white-space:normal} .db-tab td{padding:7px 4px} }
+  .db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:14px}
+  .db-grid .card{margin:0}
+  .pz{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .pz svg{width:160px;height:160px;flex-shrink:0}
+  .pz svg path,.pz svg circle{stroke:#fff;stroke-width:2;cursor:default}
+  .pz svg path:hover,.pz svg circle:hover{opacity:.85}
+  .pz-ley{flex:1;min-width:150px;list-style:none;margin:0;padding:0;font-size:13px}
+  .pz-ley li{display:flex;align-items:center;gap:7px;padding:3px 0;border-bottom:1px solid #F0F0F0}
+  .pz-ley i{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+  .pz-ley span{flex:1;line-height:1.25}
+  .pz-ley b{font-variant-numeric:tabular-nums}
+  .pz-ley em{font-style:normal;color:var(--gris-2);min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+  .pz-tot{font-size:12.5px;color:var(--gris-2);margin-top:6px}
+  @media (max-width:420px){ .db-grid{grid-template-columns:1fr} .pz{justify-content:center} }
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -306,10 +320,15 @@
       <div class="actualiz" id="dbInfo"></div>
     </div>
     <div class="kpis" id="dbKpis"></div>
-    <div class="card"><h2 class="subtit">Hallazgos y cierres por persona <span class="nota">(quien levantó)</span></h2><div class="db-ley" data-ley></div><div id="dbPersona"></div></div>
-    <div class="card"><h2 class="subtit">Hallazgos y levantamientos por área</h2><div class="db-ley" data-ley></div><div id="dbArea2"></div></div>
-    <div class="card"><h2 class="subtit">Hallazgos por supervisor evaluado</h2><div class="db-ley" data-ley></div><div id="dbSup"></div></div>
-    <div class="card"><h2 class="subtit">Desviaciones más repetidas</h2><div id="dbTop"></div></div>
+    <div class="db-grid">
+      <div class="card"><h2 class="subtit">Estado de los hallazgos</h2><div id="pzEstado"></div></div>
+      <div class="card"><h2 class="subtit">Hallazgos por persona <span class="nota">(quien levantó)</span></h2><div id="pzHallPer"></div></div>
+      <div class="card"><h2 class="subtit">Cierres por persona</h2><div id="pzCierrePer"></div></div>
+      <div class="card"><h2 class="subtit">Levantamientos (inspecciones) por área</h2><div id="pzInspArea"></div></div>
+      <div class="card"><h2 class="subtit">Hallazgos por área</h2><div id="pzHallArea"></div></div>
+      <div class="card"><h2 class="subtit">Hallazgos por supervisor evaluado</h2><div id="pzSup"></div></div>
+      <div class="card" style="grid-column:1/-1"><h2 class="subtit">Desviaciones más repetidas</h2><div id="pzTop"></div></div>
+    </div>
   </section>
 
   <!-- ================= REGISTROS ================= -->
@@ -1158,6 +1177,19 @@ function barra(c,p,v,max){
   return `<div class="db-bar-w"><div class="db-bar" style="flex:1">${seg("c",c,"Cerrados")}${seg("p",p,"Pendientes en plazo")}${seg("v",v,"Vencidos")}</div><b>${tot}</b></div>`;
 }
 const LEY='<span><i style="background:var(--verde)"></i>Cerrados</span><span><i style="background:var(--naranjo)"></i>Pendientes en plazo</span><span><i style="background:var(--rojo)"></i>Vencidos</span>';
+function torta(S, unidad){
+  S=S.filter(s=>s.n>0); const tot=S.reduce((a,s)=>a+s.n,0);
+  if(!tot) return '<div class="db-vacio">Sin datos para estos filtros.</div>';
+  const R=80, C=85; let ang=-Math.PI/2, svg="";
+  const pc=n=>Math.round(n/tot*100)+"%";
+  S.forEach(s=>{ const a=s.n/tot*2*Math.PI, tit=`<title>${esc(s.nombre)}: ${s.n} (${pc(s.n)})</title>`;
+    if(S.length===1){ svg+=`<circle cx="${C}" cy="${C}" r="${R}" fill="${s.color}">${tit}</circle>`; return; }
+    const x1=C+R*Math.cos(ang), y1=C+R*Math.sin(ang); ang+=a; const x2=C+R*Math.cos(ang), y2=C+R*Math.sin(ang);
+    svg+=`<path d="M${C},${C} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${a>Math.PI?1:0} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${s.color}">${tit}</path>`; });
+  return `<div class="pz"><svg viewBox="0 0 170 170" role="img" aria-label="Gráfico de torta">${svg}</svg>
+    <ul class="pz-ley">${S.map(s=>`<li><i style="background:${s.color}"></i><span title="${esc(s.nombre)}">${esc(s.nombre)}</span><b>${s.n}</b><em>${pc(s.n)}</em></li>`).join("")}</ul></div>
+    <div class="pz-tot">Total: ${tot} ${unidad}</div>`;
+}
 function renderDash(){
   if(!$("#dbKpis")) return;
   const fa=$("#dbArea").value, fd=$("#dbDesde").value, fh=$("#dbHasta").value, HOY=hoy();
@@ -1174,32 +1206,26 @@ function renderDash(){
     ["",pcum,"% cumplimiento promedio"],["",H.length,"Hallazgos totales"],["pend",E.p+E.v,"Pendientes"],["crit",E.v,"Vencidos"],
     ["cerr",E.c,"Cerrados"],["cerr",pctCierre(H),"% de cierre"],["",cerr.length?Math.round(aTiempo/cerr.length*100)+"%":"—","Cierres dentro del plazo"]
   ].map(([c,v,l])=>`<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
-  document.querySelectorAll("#v-dash [data-ley]").forEach(x=>x.innerHTML=LEY);
-  const vacio='<div class="db-vacio">Sin datos para estos filtros.</div>';
-  // por persona (quien levantó): inspecciones + hallazgos
-  const per=new Map();
-  agrupar(I,x=>normNom(x.verificador),x=>x.verificador).forEach(g=>per.set(g.k,{nombre:g.nombre,insp:g.items.length,H:[]}));
-  agrupar(H,h=>normNom(h.verificador),h=>h.verificador).forEach(g=>{ if(!per.has(g.k)) per.set(g.k,{nombre:g.nombre,insp:0,H:[]}); per.get(g.k).H=g.items; });
-  const P=[...per.values()].sort((a,b)=>b.H.length-a.H.length||b.insp-a.insp||a.nombre.localeCompare(b.nombre));
-  const maxP=Math.max(1,...P.map(x=>x.H.length));
-  $("#dbPersona").innerHTML = P.length ? `<table class="db-tab"><thead><tr><th>Persona</th><th class="ocultar-m">Inspecciones</th><th style="width:45%">Hallazgos</th><th>Cerrados</th><th class="ocultar-m">% cierre</th><th class="ocultar-m">Con atraso</th></tr></thead><tbody>${P.map(x=>{ const e=est(x.H), at=x.H.filter(h=>h.estado==="CERRADO"&&h.plazo&&h.fechaCierre&&h.fechaCierre>h.plazo).length;
-    return `<tr><td class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</td><td class="n ocultar-m">${x.insp}</td><td>${barra(e.c,e.p,e.v,maxP)}</td><td class="n">${e.c}</td><td class="n ocultar-m">${pctCierre(x.H)}</td><td class="n ocultar-m">${at}</td></tr>`; }).join("")}</tbody></table>` : vacio;
-  // por área
+  // colores fijos por persona (misma persona = mismo color en todos los gráficos)
+  const CAT=["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#6250d6","#e34948"], OTRO="#9E9E9E";
+  const pesoPer=new Map(); I.forEach(x=>{const k=normNom(x.verificador); pesoPer.set(k,(pesoPer.get(k)||0)+1);}); H.forEach(h=>{const k=normNom(h.verificador); pesoPer.set(k,(pesoPer.get(k)||0)+2);});
+  const ordenPer=[...pesoPer.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(x=>x[0]);
+  const colPer=k=>{ const i=ordenPer.indexOf(k); return i>=0&&i<7?CAT[i]:OTRO; };
   const AREAS=["Planta","Depósito de Relaves","Mina","Proyectos","Izaje"];
-  const A=[...new Set(AREAS.concat(I.map(x=>x.area),H.map(h=>h.area)).filter(Boolean))].map(a=>{ const Ia=I.filter(x=>x.area===a), Ha=H.filter(h=>h.area===a), pp=Ia.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p));
-    return {a, insp:Ia.length, H:Ha, pc:pp.length?Math.round(pp.reduce((s,b)=>s+ +b,0)/pp.length*100)+"%":"—"}; }).filter(x=>x.insp||x.H.length).sort((a,b)=>b.insp-a.insp||b.H.length-a.H.length);
-  const maxI=Math.max(1,...A.map(x=>x.insp)), maxA=Math.max(1,...A.map(x=>x.H.length));
-  $("#dbArea2").innerHTML = A.length ? `<table class="db-tab"><thead><tr><th>Área</th><th style="width:22%">Levantamientos (inspecciones)</th><th style="width:38%">Hallazgos</th><th class="ocultar-m">% cierre</th><th class="ocultar-m">% cumplimiento</th></tr></thead><tbody>${A.map(x=>{ const e=est(x.H);
-    return `<tr><td class="nom">${esc(x.a)}</td><td><div class="db-bar-w"><div class="db-bar" style="flex:1"><span class="i" style="width:${x.insp/maxI*100}%" title="Inspecciones: ${x.insp}"></span></div><b>${x.insp}</b></div></td><td>${barra(e.c,e.p,e.v,maxA)}</td><td class="n ocultar-m">${pctCierre(x.H)}</td><td class="n ocultar-m">${x.pc}</td></tr>`; }).join("")}</tbody></table>
-    <div class="nota" style="margin-top:6px">Gris: inspecciones realizadas en el área.</div>` : vacio;
-  // por supervisor
-  const S=agrupar(H,h=>normNom(h.lider),h=>h.lider).sort((a,b)=>b.items.length-a.items.length), maxS=Math.max(1,...S.map(x=>x.items.length));
-  $("#dbSup").innerHTML = S.length ? `<table class="db-tab"><thead><tr><th>Supervisor</th><th style="width:55%">Hallazgos</th><th>Pendientes</th><th class="ocultar-m">% cierre</th></tr></thead><tbody>${S.map(x=>{ const e=est(x.items);
-    return `<tr><td class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</td><td>${barra(e.c,e.p,e.v,maxS)}</td><td class="n">${e.p+e.v}</td><td class="n ocultar-m">${pctCierre(x.items)}</td></tr>`; }).join("")}</tbody></table>` : vacio;
-  // desviaciones más repetidas
-  const T=agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).sort((a,b)=>b.items.length-a.items.length).slice(0,8), maxT=Math.max(1,...T.map(x=>x.items.length));
-  $("#dbTop").innerHTML = T.length ? `<table class="db-tab"><thead><tr><th>Desviación</th><th style="width:45%">Veces</th></tr></thead><tbody>${T.map(x=>{ const e=est(x.items);
-    return `<tr><td style="font-weight:600">${esc(x.nombre)}</td><td>${barra(e.c,e.p,e.v,maxT)}</td></tr>`; }).join("")}</tbody></table>` : vacio;
+  const colArea=a=>{ const i=AREAS.indexOf(a); return i>=0?CAT[i]:OTRO; };
+  // segmentos de lista agrupada -> {nombre, n, color}; más de 7 => "Otros"
+  const segs=(grupos,color,max=7)=>{ const L=grupos.sort((a,b)=>b.n-a.n), col=(g,i)=>color?color(g.k):(CAT[i]||OTRO);
+    if(L.length<=max+1) return L.map((g,i)=>({...g,color:col(g,i)}));
+    const resto=L.slice(max).reduce((s,g)=>s+g.n,0); return L.slice(0,max).map((g,i)=>({...g,color:col(g,i)})).concat([{nombre:`Otros (${L.length-max})`,n:resto,color:OTRO}]); };
+  const porPer=L=>agrupar(L,x=>normNom(x.verificador),x=>x.verificador).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length}));
+  $("#pzEstado").innerHTML=torta([{nombre:"Cerrados",n:E.c,color:"var(--verde)"},{nombre:"Pendientes en plazo",n:E.p,color:"var(--naranjo)"},{nombre:"Vencidos",n:E.v,color:"var(--rojo)"}],"hallazgos");
+  $("#pzHallPer").innerHTML=torta(segs(porPer(H),colPer),"hallazgos");
+  $("#pzCierrePer").innerHTML=torta(segs(porPer(H.filter(h=>h.estado==="CERRADO")),colPer),"cierres");
+  const porArea=L=>agrupar(L,x=>x.area,x=>x.area).map(g=>({k:g.nombre,nombre:g.nombre,n:g.items.length}));
+  $("#pzInspArea").innerHTML=torta(segs(porArea(I),colArea),"inspecciones");
+  $("#pzHallArea").innerHTML=torta(segs(porArea(H),colArea),"hallazgos");
+  $("#pzSup").innerHTML=torta(segs(agrupar(H,h=>normNom(h.lider),h=>h.lider).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos");
+  $("#pzTop").innerHTML=torta(segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos");
   const u=ls.get(KEY+"_ulth"); $("#dbInfo").textContent = u ? `Datos de todos los equipos · actualizado ${new Date(u).toLocaleString("es-CL")}` : "Datos de este equipo (se actualizan con conexión).";
 }
 ["#dbArea","#dbDesde","#dbHasta"].forEach(s=>$(s).addEventListener("input", renderDash));
