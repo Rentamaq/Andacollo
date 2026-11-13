@@ -327,7 +327,7 @@
       </label>
       <label class="campo">Fecha de cierre<input type="date" id="dFechaCierre"></label>
       <div>
-        <label class="tool">📎 Adjuntar evidencia de cierre<input type="file" id="dFile" accept="image/*,application/pdf" multiple hidden></label>
+        <label class="tool">📎 Adjuntar evidencia de cierre<input type="file" id="dFile" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label>
         <div class="evids" id="dEvids" style="margin-top:8px"></div>
       </div>
       <div class="error-msg" id="dErr" style="display:none">Para CERRAR indique la medida aplicada / evidencia.</div>
@@ -658,7 +658,7 @@ function construir(){
         </div>
         <div class="herr">
           <button type="button" class="tool t-com">💬 Comentario</button>
-          <label class="tool">📎 Adjuntar evidencia <span class="cnt" hidden></span><input type="file" class="c-file" accept="image/*,application/pdf" multiple hidden></label>
+          <label class="tool">📎 Adjuntar evidencia <span class="cnt" hidden></span><input type="file" class="c-file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label>
         </div>
         <div class="c-com"><label class="campo"><span>Comentario <span class="obl">* obligatorio cuando la respuesta es NO</span></span>
           <textarea class="c-txt" placeholder="Observaciones, desviación detectada, contexto…"></textarea></label></div>
@@ -703,7 +703,7 @@ function agregarOtro(){
       <label class="campo">Plazo<input type="date" class="o-plazo"></label>
     </div>
     <label class="campo" style="margin-top:8px">Descripción del hallazgo<textarea class="o-txt" placeholder="Qué se observó, dónde y qué medida se tomó o se debe tomar…"></textarea></label>
-    <div class="herr"><label class="tool">📎 Adjuntar fotos <span class="cnt" hidden></span><input type="file" class="c-file" accept="image/*,application/pdf" multiple hidden></label></div>
+    <div class="herr"><label class="tool">📎 Adjuntar fotos <span class="cnt" hidden></span><input type="file" class="c-file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label></div>
     <div class="evids"></div><div class="error-msg"></div>`;
   $("#otrosLista").appendChild(d); return d;
 }
