@@ -150,6 +150,21 @@
   .otro{border:1px solid var(--borde);border-left:4px solid var(--naranjo);border-radius:8px;padding:12px;margin:0 0 12px;position:relative}
   .otro .o-quitar{position:absolute;top:8px;right:8px;background:none;border:0;color:var(--rojo);font-size:13px;font-weight:700;cursor:pointer}
   .otro.error{border-color:var(--rojo);background:var(--rojo-claro)}
+  .db-ley{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--gris-2);margin:0 0 10px}
+  .db-ley i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .db-tab{width:100%;border-collapse:collapse;font-size:13.5px}
+  .db-tab th{background:none;color:var(--gris-2);font-weight:600;font-size:12px;text-align:left;border-bottom:1px solid var(--borde);padding:6px 8px}
+  .db-tab td{padding:7px 8px;border-bottom:1px solid #EEE;vertical-align:middle}
+  .db-tab td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;width:1%}
+  .db-tab td.nom{white-space:nowrap;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+  .db-bar{display:flex;gap:2px;height:18px;align-items:stretch;min-width:120px}
+  .db-bar span{display:block;height:100%;min-width:3px}
+  .db-bar span:last-child{border-radius:0 4px 4px 0}
+  .db-bar .c{background:var(--verde)} .db-bar .p{background:var(--naranjo)} .db-bar .v{background:var(--rojo)} .db-bar .i{background:#7A7A7A}
+  .db-bar-w{display:flex;align-items:center;gap:8px} .db-bar-w b{font-size:12.5px;min-width:22px}
+  .db-vacio{color:var(--gris-2);font-size:14px;padding:10px 0}
+  #dbPersona,#dbArea2,#dbSup,#dbTop{overflow-x:auto}
+  @media (max-width:700px){ .db-tab .ocultar-m{display:none} .db-tab td.nom{max-width:105px;white-space:normal} .db-bar{min-width:50px} .db-tab th{white-space:normal} .db-tab td{padding:7px 4px} }
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
@@ -169,6 +184,7 @@
   <div class="tabs">
     <button class="tab activa" data-vista="v-form">Formulario</button>
     <button class="tab" data-vista="v-seg">Seguimiento de hallazgos <span class="badge" id="badgePend">0</span></button>
+    <button class="tab" data-vista="v-dash">📊 Dashboard</button>
     <button class="tab" data-vista="v-reg">🔒 Registros</button>
   </div>
   <div class="sync-box">
@@ -275,6 +291,25 @@
         </table>
       </div>
     </div>
+  </section>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="v-dash" class="vista">
+    <div class="card">
+      <div class="filtros">
+        <label class="campo">Área / Lugar
+          <select id="dbArea"><option value="">Todas</option><option>Planta</option><option>Depósito de Relaves</option><option>Mina</option><option>Proyectos</option><option>Izaje</option></select></label>
+        <label class="campo">Desde<input type="date" id="dbDesde"></label>
+        <label class="campo">Hasta<input type="date" id="dbHasta"></label>
+        <button class="btn sec" id="dbActualizar" type="button">↻ Actualizar datos</button>
+      </div>
+      <div class="actualiz" id="dbInfo"></div>
+    </div>
+    <div class="kpis" id="dbKpis"></div>
+    <div class="card"><h2 class="subtit">Hallazgos y cierres por persona <span class="nota">(quien levantó)</span></h2><div class="db-ley" data-ley></div><div id="dbPersona"></div></div>
+    <div class="card"><h2 class="subtit">Hallazgos y levantamientos por área</h2><div class="db-ley" data-ley></div><div id="dbArea2"></div></div>
+    <div class="card"><h2 class="subtit">Hallazgos por supervisor evaluado</h2><div class="db-ley" data-ley></div><div id="dbSup"></div></div>
+    <div class="card"><h2 class="subtit">Desviaciones más repetidas</h2><div id="dbTop"></div></div>
   </section>
 
   <!-- ================= REGISTROS ================= -->
@@ -621,7 +656,7 @@ async function traerHallazgos(){
       if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true; }
       COLA.filter(c=>c.tipo==="editarRegistro").forEach(aplicarEdicion);
       if(Array.isArray(d.eliminados) && d.eliminados.length){ if(quitarLocal(new Set(d.eliminados))) cambio=true; }
-      if(cambio){ guardar(); renderHall(); }
+      if(cambio){ guardar(); renderHall(); renderDash(); }
       ls.set(KEY+"_ulth", new Date().toISOString());
     }
   }catch(e){}
@@ -806,6 +841,7 @@ function activarTab(t){
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("activa", x===t));
   document.querySelectorAll(".vista").forEach(v=>v.classList.toggle("activa", v.id===t.dataset.vista));
   if(t.dataset.vista==="v-seg") traerHallazgos();
+  if(t.dataset.vista==="v-dash"){ renderDash(); traerHallazgos(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.vista==="v-reg" && !ADMIN){ $("#pinIn").value=""; $("#pinErr").style.display="none"; $("#dlgPin").showModal(); $("#pinIn").focus(); return; }
@@ -1108,7 +1144,67 @@ function renderReg(){
       <td style="color:var(--verde);font-weight:700">${si}</td><td style="color:var(--rojo);font-weight:700">${no}</td><td>${na}</td><td><b>${pct}</b></td><td><button class="btn sec peq" data-det="${esc(r.id)}">Ver</button></td></tr>`;
   }).join("") : `<tr><td colspan="9" class="vacio">Aún no hay formularios enviados.</td></tr>`;
 }
-function render(){ renderHall(); renderReg(); }
+/* ---------- dashboard ---------- */
+const normNom = s => String(s||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ");
+function agrupar(lista, clave, nombre){
+  const m=new Map();
+  lista.forEach(x=>{ const k=clave(x)||"(sin dato)"; if(!m.has(k)) m.set(k,{nombres:new Map(),items:[]}); const g=m.get(k); g.items.push(x);
+    const n=String(nombre(x)||"(sin dato)").trim(); g.nombres.set(n,(g.nombres.get(n)||0)+1); });
+  return [...m.entries()].map(([k,g])=>({k, nombre:[...g.nombres].sort((a,b)=>b[1]-a[1])[0][0], items:g.items}));
+}
+function barra(c,p,v,max){
+  const w=n=>max? (n/max*100):0, tot=c+p+v;
+  const seg=(cls,n,t)=>n?`<span class="${cls}" style="width:${w(n)}%" title="${t}: ${n}"></span>`:"";
+  return `<div class="db-bar-w"><div class="db-bar" style="flex:1">${seg("c",c,"Cerrados")}${seg("p",p,"Pendientes en plazo")}${seg("v",v,"Vencidos")}</div><b>${tot}</b></div>`;
+}
+const LEY='<span><i style="background:var(--verde)"></i>Cerrados</span><span><i style="background:var(--naranjo)"></i>Pendientes en plazo</span><span><i style="background:var(--rojo)"></i>Vencidos</span>';
+function renderDash(){
+  if(!$("#dbKpis")) return;
+  const fa=$("#dbArea").value, fd=$("#dbDesde").value, fh=$("#dbHasta").value, HOY=hoy();
+  const enRango = x=>(!fa||x.area===fa)&&(!fd||x.fecha>=fd)&&(!fh||x.fecha<=fh);
+  const I=listaInspecciones().filter(enRango), H=DB.hallazgos.filter(enRango);
+  const venc=h=>h.estado==="PENDIENTE"&&h.plazo&&h.plazo<HOY;
+  const est=L=>({c:L.filter(h=>h.estado==="CERRADO").length, v:L.filter(venc).length, p:L.filter(h=>h.estado==="PENDIENTE"&&!venc(h)).length});
+  const pctCierre=L=>L.length?Math.round(L.filter(h=>h.estado==="CERRADO").length/L.length*100)+"%":"—";
+  const pcts=I.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p));
+  const pcum=pcts.length?Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%":"—";
+  const E=est(H), cerr=H.filter(h=>h.estado==="CERRADO"), aTiempo=cerr.filter(h=>!h.plazo||!h.fechaCierre||h.fechaCierre<=h.plazo).length;
+  $("#dbKpis").innerHTML=[
+    ["insp",I.length,"Inspecciones (levantamientos)"],["",new Set(I.map(x=>normNom(x.lider)).filter(Boolean)).size,"Supervisores evaluados"],
+    ["",pcum,"% cumplimiento promedio"],["",H.length,"Hallazgos totales"],["pend",E.p+E.v,"Pendientes"],["crit",E.v,"Vencidos"],
+    ["cerr",E.c,"Cerrados"],["cerr",pctCierre(H),"% de cierre"],["",cerr.length?Math.round(aTiempo/cerr.length*100)+"%":"—","Cierres dentro del plazo"]
+  ].map(([c,v,l])=>`<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
+  document.querySelectorAll("#v-dash [data-ley]").forEach(x=>x.innerHTML=LEY);
+  const vacio='<div class="db-vacio">Sin datos para estos filtros.</div>';
+  // por persona (quien levantó): inspecciones + hallazgos
+  const per=new Map();
+  agrupar(I,x=>normNom(x.verificador),x=>x.verificador).forEach(g=>per.set(g.k,{nombre:g.nombre,insp:g.items.length,H:[]}));
+  agrupar(H,h=>normNom(h.verificador),h=>h.verificador).forEach(g=>{ if(!per.has(g.k)) per.set(g.k,{nombre:g.nombre,insp:0,H:[]}); per.get(g.k).H=g.items; });
+  const P=[...per.values()].sort((a,b)=>b.H.length-a.H.length||b.insp-a.insp||a.nombre.localeCompare(b.nombre));
+  const maxP=Math.max(1,...P.map(x=>x.H.length));
+  $("#dbPersona").innerHTML = P.length ? `<table class="db-tab"><thead><tr><th>Persona</th><th class="ocultar-m">Inspecciones</th><th style="width:45%">Hallazgos</th><th>Cerrados</th><th class="ocultar-m">% cierre</th><th class="ocultar-m">Con atraso</th></tr></thead><tbody>${P.map(x=>{ const e=est(x.H), at=x.H.filter(h=>h.estado==="CERRADO"&&h.plazo&&h.fechaCierre&&h.fechaCierre>h.plazo).length;
+    return `<tr><td class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</td><td class="n ocultar-m">${x.insp}</td><td>${barra(e.c,e.p,e.v,maxP)}</td><td class="n">${e.c}</td><td class="n ocultar-m">${pctCierre(x.H)}</td><td class="n ocultar-m">${at}</td></tr>`; }).join("")}</tbody></table>` : vacio;
+  // por área
+  const AREAS=["Planta","Depósito de Relaves","Mina","Proyectos","Izaje"];
+  const A=[...new Set(AREAS.concat(I.map(x=>x.area),H.map(h=>h.area)).filter(Boolean))].map(a=>{ const Ia=I.filter(x=>x.area===a), Ha=H.filter(h=>h.area===a), pp=Ia.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p));
+    return {a, insp:Ia.length, H:Ha, pc:pp.length?Math.round(pp.reduce((s,b)=>s+ +b,0)/pp.length*100)+"%":"—"}; }).filter(x=>x.insp||x.H.length).sort((a,b)=>b.insp-a.insp||b.H.length-a.H.length);
+  const maxI=Math.max(1,...A.map(x=>x.insp)), maxA=Math.max(1,...A.map(x=>x.H.length));
+  $("#dbArea2").innerHTML = A.length ? `<table class="db-tab"><thead><tr><th>Área</th><th style="width:22%">Levantamientos (inspecciones)</th><th style="width:38%">Hallazgos</th><th class="ocultar-m">% cierre</th><th class="ocultar-m">% cumplimiento</th></tr></thead><tbody>${A.map(x=>{ const e=est(x.H);
+    return `<tr><td class="nom">${esc(x.a)}</td><td><div class="db-bar-w"><div class="db-bar" style="flex:1"><span class="i" style="width:${x.insp/maxI*100}%" title="Inspecciones: ${x.insp}"></span></div><b>${x.insp}</b></div></td><td>${barra(e.c,e.p,e.v,maxA)}</td><td class="n ocultar-m">${pctCierre(x.H)}</td><td class="n ocultar-m">${x.pc}</td></tr>`; }).join("")}</tbody></table>
+    <div class="nota" style="margin-top:6px">Gris: inspecciones realizadas en el área.</div>` : vacio;
+  // por supervisor
+  const S=agrupar(H,h=>normNom(h.lider),h=>h.lider).sort((a,b)=>b.items.length-a.items.length), maxS=Math.max(1,...S.map(x=>x.items.length));
+  $("#dbSup").innerHTML = S.length ? `<table class="db-tab"><thead><tr><th>Supervisor</th><th style="width:55%">Hallazgos</th><th>Pendientes</th><th class="ocultar-m">% cierre</th></tr></thead><tbody>${S.map(x=>{ const e=est(x.items);
+    return `<tr><td class="nom" title="${esc(x.nombre)}">${esc(x.nombre)}</td><td>${barra(e.c,e.p,e.v,maxS)}</td><td class="n">${e.p+e.v}</td><td class="n ocultar-m">${pctCierre(x.items)}</td></tr>`; }).join("")}</tbody></table>` : vacio;
+  // desviaciones más repetidas
+  const T=agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).sort((a,b)=>b.items.length-a.items.length).slice(0,8), maxT=Math.max(1,...T.map(x=>x.items.length));
+  $("#dbTop").innerHTML = T.length ? `<table class="db-tab"><thead><tr><th>Desviación</th><th style="width:45%">Veces</th></tr></thead><tbody>${T.map(x=>{ const e=est(x.items);
+    return `<tr><td style="font-weight:600">${esc(x.nombre)}</td><td>${barra(e.c,e.p,e.v,maxT)}</td></tr>`; }).join("")}</tbody></table>` : vacio;
+  const u=ls.get(KEY+"_ulth"); $("#dbInfo").textContent = u ? `Datos de todos los equipos · actualizado ${new Date(u).toLocaleString("es-CL")}` : "Datos de este equipo (se actualizan con conexión).";
+}
+["#dbArea","#dbDesde","#dbHasta"].forEach(s=>$(s).addEventListener("input", renderDash));
+$("#dbActualizar").onclick=async()=>{ await traerHallazgos(); renderDash(); toast("Datos actualizados."); };
+function render(){ renderHall(); renderReg(); renderDash(); }
 $("#tbReg").addEventListener("click", e=>{
   const id=e.target.dataset.det; if(!id) return;
   const r=DB.registros.find(x=>x.id===id);
