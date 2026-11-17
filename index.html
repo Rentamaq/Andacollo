@@ -325,7 +325,7 @@
       <div class="hf-chip" id="hfChip-insp" style="display:none"></div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th data-hf="insp:fecha">Fecha</th><th data-hf="insp:lider">Supervisor evaluado</th><th data-hf="insp:area">Área / Lugar</th><th data-hf="insp:verif">Inspeccionado por</th><th data-hf="insp:si">SÍ</th><th data-hf="insp:no">NO</th><th data-hf="insp:na">N/A</th><th data-hf="insp:pct">% cumplimiento</th><th data-hf="insp:hall">Hallazgos</th><th>Reporte</th><th class="solo-admin"></th></tr></thead>
+          <thead><tr><th data-hf="insp:fecha">Fecha</th><th data-hf="insp:lider">Supervisor del área</th><th data-hf="insp:trab">Trabajador evaluado</th><th data-hf="insp:area">Área / Lugar</th><th data-hf="insp:verif">Inspeccionado por</th><th data-hf="insp:si">SÍ</th><th data-hf="insp:no">NO</th><th data-hf="insp:na">N/A</th><th data-hf="insp:pct">% cumplimiento</th><th data-hf="insp:hall">Hallazgos</th><th>Reporte</th><th class="solo-admin"></th></tr></thead>
           <tbody id="tbInsp"></tbody>
         </table>
       </div>
@@ -384,7 +384,7 @@
       <div class="card"><h2 class="subtit">Cierres por persona</h2><div id="pzCierrePer"></div></div>
       <div class="card"><h2 class="subtit">Levantamientos (inspecciones) por área</h2><div id="pzInspArea"></div></div>
       <div class="card"><h2 class="subtit">Hallazgos por área</h2><div id="pzHallArea"></div></div>
-      <div class="card"><h2 class="subtit">Hallazgos por supervisor evaluado</h2><div id="pzSup"></div></div>
+      <div class="card"><h2 class="subtit">Hallazgos por supervisor del área</h2><div id="pzSup"></div></div>
       <div class="card" style="grid-column:1/-1"><h2 class="subtit">Desviaciones más repetidas</h2><div id="pzTop"></div></div>
     </div>
   </section>
@@ -413,7 +413,7 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Inspeccionado por</th><th>Área / Lugar</th><th>Supervisor evaluado</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Inspeccionado por</th><th>Área / Lugar</th><th>Supervisor del área</th><th>SÍ</th><th>NO</th><th>N/A</th><th>% cumplimiento</th><th></th></tr></thead>
           <tbody id="tbReg"></tbody>
         </table>
       </div>
@@ -467,7 +467,8 @@
       <label class="campo">Fecha<input type="date" id="eiFecha" required></label>
       <label class="campo">Inspeccionado por (quien inspecciona)<input type="text" id="eiVerif" required></label>
       <label class="campo">Área / Lugar<select id="eiArea"><option>Planta</option><option>Depósito de Relaves</option><option>Mina</option><option>Proyectos</option><option>Izaje</option></select></label>
-      <label class="campo">Supervisor evaluado<input type="text" id="eiLider" required></label>
+      <label class="campo">Supervisor del área<input type="text" id="eiLider" required></label>
+      <label class="campo">Trabajador evaluado<input type="text" id="eiTrab"></label>
       <div class="nota">El cambio se aplica también a las respuestas y hallazgos de esta inspección, en la planilla y en todos los equipos.</div>
     </div>
     <div class="dlg-f"><button class="btn sec" value="cancel" formnovalidate>Cancelar</button><button class="btn" id="eiOk" value="ok">Guardar</button></div>
@@ -503,7 +504,8 @@ const CONFIG = {
     {id:"fecha",       label:"Fecha",                    tipo:"date",   req:true},
     {id:"verificador", label:"Nombre de quien inspecciona", tipo:"text",   req:true},
     {id:"area",        label:"Área / Lugar",             tipo:"select", opciones:["Planta","Depósito de Relaves","Mina","Proyectos","Izaje"], req:true},
-    {id:"lider",       label:"Supervisor evaluado", tipo:"text",  req:true}
+    {id:"lider",       label:"Supervisor del área", tipo:"text",  req:true},
+    {id:"trabajador",  label:"Trabajador evaluado", tipo:"text",  req:true}
   ],
   secciones: [
     { titulo:"1. Requisitos a las Personas",
@@ -975,7 +977,7 @@ function listaInspecciones(){
   const m=new Map();
   (DB.inspecciones||[]).forEach(x=>m.set(x.id,{...x}));
   DB.registros.forEach(r=>{ if(m.has(r.id)) return; const c=v=>r.respuestas.filter(x=>x.valor===v).length, si=c("SI"), no=c("NO"), na=c("NA");
-    m.set(r.id,{id:r.id, fecha:r.datos.fecha, verificador:r.datos.verificador, area:r.datos.area, lider:r.datos.lider, si, no, na, pct: si+no? si/(si+no) : null}); });
+    m.set(r.id,{id:r.id, fecha:r.datos.fecha, verificador:r.datos.verificador, area:r.datos.area, lider:r.datos.lider, trabajador:r.datos.trabajador||"", si, no, na, pct: si+no? si/(si+no) : null}); });
   return [...m.values()].map(x=>({...x, hall: DB.hallazgos.filter(h=>h.registro===x.id).length}));
 }
 let INSP_VISTA=[];
@@ -992,13 +994,13 @@ function renderInsp(){
   $("#iPct").textContent=pcts.length? Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%" : "—";
   const cls=p=>p>=.9?"b":p>=.7?"m":"r";
   $("#tbInsp").innerHTML = L.length ? L.map(x=>{ const p=(x.pct===null||x.pct===""||isNaN(x.pct))?null:+x.pct; const nh=Math.max(x.hall, 0);
-    return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td><button class="lnk" type="button" data-rep="${esc(x.id)}">${esc(x.area)||"Ver"} ›</button></td><td>${esc(x.verificador)}</td>
+    return `<tr><td style="white-space:nowrap">${fmt(x.fecha)}</td><td><b>${esc(x.lider)}</b></td><td>${esc(x.trabajador)||'<span class="nota">—</span>'}</td><td><button class="lnk" type="button" data-rep="${esc(x.id)}">${esc(x.area)||"Ver"} ›</button></td><td>${esc(x.verificador)}</td>
       <td style="color:var(--verde);font-weight:700">${x.si}</td><td style="color:var(--rojo);font-weight:700">${x.no}</td><td>${x.na}</td>
       <td>${p===null?"—":`<span class="pct ${cls(p)}">${Math.round(p*100)}%</span>`}</td>
       <td>${nh?`<button class="lnk" type="button" data-ir-hall="${esc(x.id)}" title="Ir a los hallazgos de esta inspección"><span class="estado PENDIENTE">${nh}</span> Ver ›</button>`:+x.no?`<span class="estado PENDIENTE">${x.no}</span>`:`<span class="estado CERRADO">Sin hallazgos</span>`}</td>
       <td><button class="btn sec peq" type="button" data-rep="${esc(x.id)}">📄 Ver</button></td>
       <td class="solo-admin" style="white-space:nowrap"><button class="btn sec peq" type="button" data-edit-insp="${esc(x.id)}" title="Editar inspección">✏️</button> <button class="btn-del" type="button" data-del-insp="${esc(x.id)}" title="Eliminar inspección">🗑</button></td></tr>`; }).join("")
-    : `<tr><td colspan="11" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
+    : `<tr><td colspan="12" class="vacio">Aún no hay inspecciones${listaInspecciones().length?" con esos filtros":""}.</td></tr>`;
   hfMarcar("insp");
 }
 /* ---------- eliminar inspecciones (solo administrador) ---------- */
@@ -1022,12 +1024,12 @@ $("#tbInsp").addEventListener("click", e=>{
   const id=e.target.dataset.editInsp; if(!id || !ADMIN) return;
   const x=listaInspecciones().find(i=>i.id===id); if(!x) return;
   EDIT_INSP=id; $("#eiId").textContent=id;
-  $("#eiFecha").value=x.fecha||""; $("#eiVerif").value=x.verificador||""; $("#eiArea").value=x.area||"Planta"; $("#eiLider").value=x.lider||"";
+  $("#eiFecha").value=x.fecha||""; $("#eiVerif").value=x.verificador||""; $("#eiArea").value=x.area||"Planta"; $("#eiLider").value=x.lider||""; $("#eiTrab").value=x.trabajador||"";
   $("#dlgInsp").showModal();
 });
 $("#eiOk").addEventListener("click", e=>{
   e.preventDefault(); if(!ADMIN || !EDIT_INSP) return;
-  const datos={fecha:$("#eiFecha").value, verificador:$("#eiVerif").value.trim(), area:$("#eiArea").value, lider:$("#eiLider").value.trim()};
+  const datos={fecha:$("#eiFecha").value, verificador:$("#eiVerif").value.trim(), area:$("#eiArea").value, lider:$("#eiLider").value.trim(), trabajador:$("#eiTrab").value.trim()};
   if(!datos.fecha || !datos.verificador || !datos.lider){ toast("Completa fecha, quien inspecciona y supervisor."); return; }
   const c={tipo:"editarRegistro", id:EDIT_INSP, datos, clave: ss.get(KEY+"_clave")||""};
   COLA=COLA.filter(q=>!(q.tipo==="editarRegistro" && q.id===EDIT_INSP)); COLA.push(c); guardarCola();
@@ -1057,7 +1059,7 @@ const diasPlazo = h => {
 /* ---------- filtros por encabezado de columna (estilo Excel) ---------- */
 const sitPlazo = h => { if(h.estado==="CERRADO") return "Cerrado"; if(!h.plazo) return "Sin plazo"; const d=dif(h.plazo,hoy()); return d<0?"Vencido":d===0?"Vence hoy":d<=3?"Vence en 3 días o menos":"Al día"; };
 const HF_COLS={
-  insp:{ fecha:{t:"Fecha",v:x=>fmt(x.fecha)||"(vacío)",s:x=>x.fecha}, lider:{t:"Supervisor evaluado",v:x=>String(x.lider||"").trim()||"(vacío)"},
+  insp:{ fecha:{t:"Fecha",v:x=>fmt(x.fecha)||"(vacío)",s:x=>x.fecha}, lider:{t:"Supervisor del área",v:x=>String(x.lider||"").trim()||"(vacío)"}, trab:{t:"Trabajador evaluado",v:x=>String(x.trabajador||"").trim()||"(vacío)"},
     area:{t:"Área / Lugar",v:x=>x.area||"(vacío)"}, verif:{t:"Inspeccionado por",v:x=>String(x.verificador||"").trim()||"(vacío)"},
     si:{t:"SÍ",v:x=>+x.si||0}, no:{t:"NO",v:x=>+x.no||0}, na:{t:"N/A",v:x=>+x.na||0},
     pct:{t:"% cumplimiento",v:x=>(x.pct===null||x.pct===""||isNaN(x.pct))?"—":Math.round(x.pct*100)+"%",s:x=>(x.pct===null||x.pct===""||isNaN(x.pct))?-1:+x.pct},
@@ -1152,7 +1154,7 @@ function renderHall(){
     <td style="white-space:nowrap"><button class="btn sec peq" data-edit="${esc(h.id)}">${ADMIN?"Editar":h.estado==="PENDIENTE"?"Cerrar":"Ver"}</button>
       <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`;
   $("#tbHall").innerHTML = G.length ? G.map(([k,hs])=>{ const i=infoInsp(k), np=hs.filter(h=>h.estado==="PENDIENTE").length;
-    return `<tr class="grp"><td colspan="11"><button class="lnk grp-lnk" type="button" data-rep="${esc(k)}">📋 Inspección del ${fmt(i.fecha)} · ${esc(i.area)} · Supervisor ${esc(i.lider)||"—"} · Inspeccionado por ${esc(i.verificador)||"—"}</button>
+    return `<tr class="grp"><td colspan="11"><button class="lnk grp-lnk" type="button" data-rep="${esc(k)}">📋 Inspección del ${fmt(i.fecha)} · ${esc(i.area)} · Supervisor ${esc(i.lider)||"—"}${i.trabajador?` · Trabajador ${esc(i.trabajador)}`:""} · Inspeccionado por ${esc(i.verificador)||"—"}</button>
       <span class="nota"> · ${hs.length} hallazgo${hs.length===1?"":"s"}${np?` · <b style="color:var(--naranjo-osc)">${np} pendiente${np===1?"":"s"}</b>`:""}</span>
       <button class="btn sec peq" type="button" data-rep="${esc(k)}" style="float:right">📄 Ver reporte y evidencias</button></td></tr>`+hs.map(filaH).join(""); }).join("")
     : `<tr><td colspan="11" class="vacio">No hay hallazgos${H.length?" con esos filtros":". Se crean automáticamente cuando una respuesta es NO"}.</td></tr>`;
@@ -1262,7 +1264,7 @@ footer{margin-top:16px;font-size:8.5pt;color:#8A8A8A;border-top:1px solid #D9D9D
 <div class=kpis><div class="kpi o"><b>${P.length}</b><span>Hallazgos pendientes</span></div><div class="kpi r"><b>${tv}</b><span>Vencidos</span></div><div class="kpi o"><b>${tp}</b><span>Vencen en 2 días o menos</span></div><div class="kpi g"><b>${C.length}</b><span>Cerrados</span></div><div class=kpi><b>${nInsp}</b><span>Inspecciones realizadas</span></div></div>
 <p class=lead>${lead}</p>
 ${P.length?`<h2>Resumen por persona</h2><table><thead><tr><th>Persona que levantó</th><th>Pendientes</th><th>Vencidos</th><th>Vencen en 2 días o menos</th><th>Plazo más próximo</th></tr></thead><tbody>${res}<tr><td><b>Total</b></td><td class=c><b>${P.length}</b></td><td class=c><b>${tv}</b></td><td class=c><b>${tp}</b></td><td></td></tr></tbody></table>
-<h2>Por supervisor evaluado</h2><table><thead><tr><th>Supervisor</th><th>Área</th><th>Pendientes</th><th>Vencidos</th><th>Levantados por</th></tr></thead><tbody>${supRows}</tbody></table>
+<h2>Por supervisor del área</h2><table><thead><tr><th>Supervisor</th><th>Área</th><th>Pendientes</th><th>Vencidos</th><th>Levantados por</th></tr></thead><tbody>${supRows}</tbody></table>
 <h2 class=brk>Detalle de pendientes por persona</h2><p class=sub>Orden: plazo más próximo primero.</p>${det}`:""}
 ${C.length?`<h2>Hallazgos cerrados</h2><table><thead><tr><th>N°</th><th>Desviación / medida aplicada</th><th>Levantado por</th><th>Supervisor</th><th>Plazo</th><th>Cierre</th></tr></thead><tbody>${cer}</tbody></table>`:""}
 <footer>RENTA MAQ · Liderazgo Visible · Informe generado el ${esc(ahora)} · Días contados al ${fmt(HOY)}</footer>
@@ -1455,12 +1457,12 @@ function excelDashboard(){
     {nombre:"Resumen", anchos:[34,16], filas:[["Indicador","Valor"],["Inspecciones (levantamientos)",I.length],["Supervisores evaluados",new Set(I.map(x=>normNom(x.lider)).filter(Boolean)).size],["% cumplimiento promedio",prom(I)],["Hallazgos totales",H.length],["Pendientes",H.length-tot[3]],["Vencidos",tot[5]],["Cerrados",tot[3]],["% de cierre",pc(tot[3],H.length)],["Cierres dentro del plazo",pc(tot[3]-tot[7],tot[3])],[],["Filtros",filtro],["Generado",new Date().toLocaleString("es-CL")],["Fuente","App Liderazgo Visible · datos de todos los equipos"]]},
     {nombre:"Por persona", anchos, filas:[["Persona (quien levantó)",...cab.slice(1)],...per,tot], negritas:[per.length+1]},
     {nombre:"Por área", anchos, filas:[["Área / Lugar",...cab.slice(1)],...are,tot], negritas:[are.length+1]},
-    {nombre:"Por supervisor", anchos, filas:[["Supervisor evaluado",...cab.slice(1)],...sup,tot], negritas:[sup.length+1]},
+    {nombre:"Por supervisor", anchos, filas:[["Supervisor del área",...cab.slice(1)],...sup,tot], negritas:[sup.length+1]},
     {nombre:"Desviaciones", anchos:[60,10,10,12,12], filas:[["Desviación","Veces","Cerrados","Pendientes","% del total"],...top]},
     {nombre:"Hallazgos", anchos:[14,11,22,20,22,40,45,10,22,11,11,26,40,12], filas:[["N°","Fecha","Levantado por","Área / Lugar","Supervisor","Desviación","Comentario","Prioridad","Responsable","Plazo","Estado","Situación del plazo","Medida de cierre","Fecha cierre"],
       ...H.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado,sitH(h),h.cierre,fmt(h.fechaCierre)])]},
-    {nombre:"Inspecciones", anchos:[11,24,20,26,7,7,7,14,10], filas:[["Fecha","Quien inspecciona","Área / Lugar","Supervisor evaluado","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
-      ...I.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(x=>[fmt(x.fecha),x.verificador,x.area,x.lider,+x.si||0,+x.no||0,+x.na||0,(x.pct===null||x.pct===""||isNaN(x.pct))?"":{pct:+x.pct},x.hall])]}
+    {nombre:"Inspecciones", anchos:[11,24,20,26,24,7,7,7,14,10], filas:[["Fecha","Quien inspecciona","Área / Lugar","Supervisor del área","Trabajador evaluado","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
+      ...I.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(x=>[fmt(x.fecha),x.verificador,x.area,x.lider,x.trabajador||"",+x.si||0,+x.no||0,+x.na||0,(x.pct===null||x.pct===""||isNaN(x.pct))?"":{pct:+x.pct},x.hall])]}
   ];
   const blob=xlsx(hojas), a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download=`Dashboard_Liderazgo_Visible_${hoy()}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
@@ -1491,12 +1493,12 @@ function descargar(nombre, contenido, tipo){
 }
 const csv = filas => "﻿"+filas.map(f=>f.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n");
 $("#btnCsv").onclick=()=>descargar(`hallazgos_${hoy()}.csv`, csv([
-  ["N°","Fecha","Quien inspecciona","Área","Supervisor evaluado","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
+  ["N°","Fecha","Quien inspecciona","Área","Supervisor del área","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
   ...HALL_VISTA.map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado,h.cierre,fmt(h.fechaCierre),(h.evid||[]).map(v=>v.name).join(", "),(h.evidCierre||[]).map(v=>v.name).join(", ")])
 ]),"text/csv;charset=utf-8");
 $("#btnCsvInsp").onclick=()=>descargar(`inspecciones_${hoy()}.csv`, csv([
-  ["Fecha","Supervisor evaluado","Área","Quien inspecciona","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
-  ...INSP_VISTA.map(x=>[fmt(x.fecha),x.lider,x.area,x.verificador,x.si,x.no,x.na,(x.pct===null||x.pct===""||isNaN(x.pct))?"":Math.round(x.pct*100)+"%",x.hall||x.no])
+  ["Fecha","Supervisor del área","Trabajador evaluado","Área","Quien inspecciona","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
+  ...INSP_VISTA.map(x=>[fmt(x.fecha),x.lider,x.trabajador||"",x.area,x.verificador,x.si,x.no,x.na,(x.pct===null||x.pct===""||isNaN(x.pct))?"":Math.round(x.pct*100)+"%",x.hall||x.no])
 ]),"text/csv;charset=utf-8");
 $("#btnCsvResp").onclick=()=>{
   const cab=[...CONFIG.datosGenerales.map(c=>c.label),"Sección","N°","Pregunta","Respuesta","Comentario","Evidencias"];
