@@ -511,7 +511,7 @@ const CONFIG = {
         "Certificación Vigente",
         "Licencia Municipal Vigente / Interna",
         {t:"Conocimiento y Aplicación de Procedimiento de Trabajo", d:"¿Conoce el procedimiento de la labor que ejecuta?"},
-        "Elementos de Protección Personal (EPP)",
+        {t:"Elementos de Protección Personal (EPP)", si:"CUMPLE", no:"NO CUMPLE", sinNA:true},
         "Porta Libro de Compromiso que Salvan Vidas"
       ]},
     { titulo:"2. Requisitos a los Equipos", obligatoria:false,
@@ -776,7 +776,7 @@ function construir(){
         <div class="opciones">
           <label class="si"><input type="radio" name="${id}" value="SI"> ${esc(P.si||"SÍ")}</label>
           <label class="no"><input type="radio" name="${id}" value="NO"> ${esc(P.no||"NO")}</label>
-          ${s.sinNA?"":`<label class="na"><input type="radio" name="${id}" value="NA"> N/A</label>`}
+          ${s.sinNA||P.sinNA?"":`<label class="na"><input type="radio" name="${id}" value="NA"> N/A</label>`}
         </div>
         <div class="herr">
           <button type="button" class="tool t-com">💬 Comentario</button>
