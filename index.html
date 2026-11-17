@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#3F3F3F">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<script>try{var _t=localStorage.getItem("rm_tema")||(matchMedia("(prefers-color-scheme: dark)").matches?"oscuro":"claro");if(_t==="oscuro")document.documentElement.setAttribute("data-tema","oscuro");}catch(e){}</script>
 <style>
   :root{
     --naranjo:#E88305; --naranjo-osc:#C76E00; --naranjo-claro:#FDF1E2;
@@ -209,6 +210,31 @@
   @media (max-width:420px){ .db-grid{grid-template-columns:1fr} .pz{justify-content:center} }
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
+  /* ---------- tema oscuro ---------- */
+  html[data-tema=oscuro]{color-scheme:dark;
+    --gris:#E6E6E6; --gris-2:#A8ADB3; --gris-claro:#15171A; --borde:#3A3F46; --blanco:#1F2227;
+    --naranjo-osc:#F4A340; --naranjo-claro:#3A2914; --verde:#62BF68; --verde-claro:#1B3320; --rojo:#F06B6B; --rojo-claro:#3E1E1F; --barra:#2A2E34}
+  html[data-tema=oscuro] nav,html[data-tema=oscuro] th,html[data-tema=oscuro] .dlg-h,html[data-tema=oscuro] .toast{background:var(--barra)}
+  html[data-tema=oscuro] th{color:#F0F0F0}
+  html[data-tema=oscuro] .db-tab th{background:none;color:var(--gris-2)}
+  html[data-tema=oscuro] th[data-hf]:hover{background:#3A4048}
+  html[data-tema=oscuro] th[data-hf].hf-on{background:#B76200}
+  html[data-tema=oscuro] input[type=text],html[data-tema=oscuro] input[type=date],html[data-tema=oscuro] input[type=search],html[data-tema=oscuro] input[type=password],html[data-tema=oscuro] input[type=number],html[data-tema=oscuro] select,html[data-tema=oscuro] textarea,
+  html[data-tema=oscuro] .btn.sec,html[data-tema=oscuro] .kpi,html[data-tema=oscuro] table,html[data-tema=oscuro] .tool,html[data-tema=oscuro] #hfPop,
+  html[data-tema=oscuro] .xtra,html[data-tema=oscuro] .x-op,html[data-tema=oscuro] .btn-del,html[data-tema=oscuro] dialog{background:var(--blanco);color:var(--gris)}
+  html[data-tema=oscuro] .x-op.sel{background:var(--naranjo-claro)}
+  html[data-tema=oscuro] tr:hover td{background:#262A30}
+  html[data-tema=oscuro] tr.grp td{background:#191B1F}
+  html[data-tema=oscuro] .info-insp p{color:var(--gris-2)}
+  html[data-tema=oscuro] .info-b.gris{background:#262A30;border-color:#7A7F86}
+  html[data-tema=oscuro] .hf-chip{background:var(--naranjo-claro);border-color:#7A4A10}
+  html[data-tema=oscuro] .db-tab td{border-bottom-color:var(--borde)}
+  html[data-tema=oscuro] .pz-ley li{border-bottom-color:var(--borde)}
+  html[data-tema=oscuro] .pz svg path,html[data-tema=oscuro] .pz svg ellipse:not(.brillo):not(.sombra){stroke:var(--blanco)}
+  html[data-tema=oscuro] .pz svg .sombra{fill:#000;opacity:.35}
+  html[data-tema=oscuro] .head-in img{background:#fff;border-radius:8px;padding:4px 8px}
+  .sync.tema{background:rgba(255,255,255,.12)}
+  @media print{html[data-tema=oscuro]{color-scheme:light}}
   @media print{nav,.acciones,.filtros,.btn{display:none!important} body{background:#fff} .vista{display:block!important}}
 </style>
 </head>
@@ -231,6 +257,7 @@
   </div>
   <div class="sync-box">
     <button class="sync" id="syncPill" type="button" title="Estado de envío a Google Drive"><span class="dot"></span><span id="syncTxt">…</span></button>
+    <button class="sync tema" id="btnTema" type="button" title="Cambiar entre tono claro y oscuro">🌙 Oscuro</button>
     <button class="sync recargar" id="btnRecargar" type="button" title="Actualizar la página (trae la última versión y los datos de todos los equipos)">↻ Actualizar</button>
   </div>
 </nav>
@@ -1513,6 +1540,13 @@ $("#btnReenviar").onclick = ()=>{
 };
 
 if(ADMIN) document.body.classList.add("admin");
+function pintarTema(){ const o=document.documentElement.getAttribute("data-tema")==="oscuro";
+  $("#btnTema").textContent=o?"☀️ Claro":"🌙 Oscuro";
+  const m=document.querySelector('meta[name=theme-color]'); if(m) m.setAttribute("content",o?"#2A2E34":"#3F3F3F"); }
+$("#btnTema").addEventListener("click",()=>{ const o=document.documentElement.getAttribute("data-tema")!=="oscuro";
+  if(o) document.documentElement.setAttribute("data-tema","oscuro"); else document.documentElement.removeAttribute("data-tema");
+  try{ localStorage.setItem("rm_tema",o?"oscuro":"claro"); }catch(e){} pintarTema(); });
+pintarTema();
 cargar(); construir(); reiniciarOtros(); render(); pintarSync(); pintarActualiz(); ciclo();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
