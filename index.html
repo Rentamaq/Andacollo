@@ -159,6 +159,7 @@
   #hfPop .hf-pie{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
   .hf-chip{background:#fff4ec;border:1px solid #f3c7a6;border-radius:8px;padding:7px 10px;margin:0 0 10px;font-size:13px}
   .hf-chip .lnk{margin-left:8px}
+  .preg-d{font-weight:400;color:var(--gris-2);font-size:.95em;margin-top:3px}
   .lnk{background:none;border:0;padding:0;font:inherit;color:var(--naranjo-osc);font-weight:700;cursor:pointer;text-align:left}
   .lnk:hover{text-decoration:underline}
   tr.grp td{background:var(--gris-claro);border-top:2px solid var(--naranjo);padding:9px 10px}
@@ -473,7 +474,7 @@ const CONFIG = {
       preguntas:[
         "Certificación Vigente",
         "Licencia Municipal Vigente / Interna",
-        "Difusión y Evaluación de Procedimientos",
+        {t:"Conocimiento y Aplicación de Procedimiento de Trabajo", d:"¿Conoce el procedimiento de la labor que ejecuta?"},
         "Elementos de Protección Personal (EPP)",
         "Porta Libro de Compromiso que Salvan Vidas"
       ]},
@@ -724,8 +725,8 @@ function construir(){
   $("#secciones").innerHTML = CONFIG.secciones.map((s,si)=>`
     <div class="card seccion"><h2>${esc(s.titulo)}</h2>
       ${s.preguntas.map((p,pi)=>{ n++; const id=`q${si}_${pi}`; return `
-      <div class="preg" data-id="${id}" data-n="${n}" data-req="${s.obligatoria===false?0:1}">
-        <div class="preg-tx"><span class="num">${n}.</span>${esc(p)}${s.obligatoria===false?"":' <span class="req">*</span>'}</div>
+      <div class="preg" data-id="${id}" data-n="${n}" data-req="${s.obligatoria===false?0:1}" data-q="${esc(typeof p==="string"?p:p.t)}">
+        <div class="preg-tx"><span class="num">${n}.</span>${esc(typeof p==="string"?p:p.t)}${s.obligatoria===false?"":' <span class="req">*</span>'}${typeof p==="string"||!p.d?"":`<div class="preg-d">${esc(p.d)}</div>`}</div>
         <div class="opciones">
           <label class="si"><input type="radio" name="${id}" value="SI"> SÍ</label>
           <label class="no"><input type="radio" name="${id}" value="NO"> NO</label>
@@ -817,7 +818,7 @@ $("#form").addEventListener("submit", e=>{
   document.querySelectorAll(".preg").forEach(box=>{
     const sel = box.querySelector("input[type=radio]:checked");
     const err = box.querySelector(".error-msg");
-    const texto = box.querySelector(".preg-tx").textContent.replace(/^\d+\.\s*/,"").replace(/\s*\*$/,"").trim();
+    const texto = box.dataset.q || box.querySelector(".preg-tx").textContent.replace(/^\d+\.\s*/,"").replace(/\s*\*$/,"").trim();
     let msg="";
     if(!sel && box.dataset.req==="1") msg="Seleccione una respuesta.";
     else if(sel && sel.value==="NO" && !box.querySelector(".c-txt").value.trim()) msg="El comentario es obligatorio cuando la respuesta es NO.";
