@@ -511,8 +511,7 @@ const CONFIG = {
         "Certificación Vigente",
         "Licencia Municipal Vigente / Interna",
         {t:"Conocimiento y Aplicación de Procedimiento de Trabajo", d:"¿Conoce el procedimiento de la labor que ejecuta?"},
-        {t:"Elementos de Protección Personal (EPP)", si:"CUMPLE", no:"NO CUMPLE", sinNA:true},
-        {t:"Porta Libro de Compromiso que Salvan Vidas", si:"CUMPLE", no:"NO CUMPLE", sinNA:true}
+        {t:"Elementos de Protección Personal (EPP)", si:"CUMPLE", no:"NO CUMPLE", sinNA:true}
       ]},
     { titulo:"2. Requisitos a los Equipos", obligatoria:false,
       preguntas:[
@@ -564,7 +563,9 @@ const CONFIG = {
       ]},
     { titulo:"8. Compromisos que salvan vidas", obligatoria:false, sinNA:true,
       preguntas:[
-        "Conoce los compromisos que salvan vidas"
+        "Conoce los compromisos que salvan vidas",
+        "¿Comprende los compromisos que salvan vidas?",
+        {t:"Porta Libro de Compromiso que Salvan Vidas", si:"CUMPLE", no:"NO CUMPLE", sinNA:true}
       ]}
   ]
 };
