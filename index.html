@@ -159,6 +159,15 @@
   #hfPop .hf-pie{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
   .hf-chip{background:#fff4ec;border:1px solid #f3c7a6;border-radius:8px;padding:7px 10px;margin:0 0 10px;font-size:13px}
   .hf-chip .lnk{margin-left:8px}
+  .xtra{display:none;margin-top:10px;border:1px dashed var(--naranjo);border-radius:8px;padding:10px 12px;background:#fff}
+  .preg.esno .xtra{display:block}
+  .x-lbl{font-weight:700;font-size:13.5px;color:var(--naranjo-osc);margin-bottom:6px}
+  .x-ops{display:flex;flex-wrap:wrap;gap:8px}
+  .x-op{display:flex;align-items:center;gap:7px;border:1px solid var(--borde);border-radius:8px;padding:8px 11px;cursor:pointer;font-size:14px;background:#fff}
+  .x-op.sel{border-color:var(--naranjo);background:var(--naranjo-claro);font-weight:600}
+  .x-op input{width:17px;height:17px;accent-color:var(--naranjo);margin:0}
+  .x-sub{margin-top:10px;padding-left:12px;border-left:3px solid var(--naranjo)}
+  .preg-grupo{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--naranjo-osc);margin:14px 0 4px}
   .preg-d{font-weight:400;color:var(--gris-2);font-size:.95em;margin-top:3px}
   .lnk{background:none;border:0;padding:0;font:inherit;color:var(--naranjo-osc);font-weight:700;cursor:pointer;text-align:left}
   .lnk:hover{text-decoration:underline}
@@ -508,8 +517,17 @@ const CONFIG = {
       ]},
     { titulo:"6. Hoja de Control de Riesgos (HCR)", obligatoria:false, sinNA:true,
       preguntas:[
-        "Se encuentra vigente (del día)",
-        "Se encuentra disponible fácil acceso"
+        "¿Tiene su HCR?",
+        "¿Se encuentra disponible con fácil acceso?",
+        {t:"¿Se encuentra completa su HCR?",
+          extra:{label:"Si la respuesta es NO, indique qué faltaba", res:"Faltaba", opciones:["Fecha","Nombre","Nombre de la actividad","Firma"]}},
+        "¿Es legible la HCR?",
+        {t:"¿Los peligros están correctamente evaluados?", grupo:"Identificación de peligros",
+          extra:{label:"Indique qué peligros no se encontraban identificados", res:"Peligros no identificados", opciones:["Peligros geotécnicos","Peligros asociados a los equipos","Trabajos cruzados","Energías","Procesos"],
+            sub:{"Energías":{label:"¿Qué energías?", opciones:["Cinética","Potencial","Térmica","Eléctrica","Hidráulica","Mecánica","Elástica"]}}}},
+        "¿Las medidas de control son acordes al peligro identificado?",
+        "¿Las medidas de control son efectivas?",
+        {t:"¿El personal comprende las medidas de control?", com:"Indique cuáles medidas de control no comprenden"}
       ]},
     { titulo:"7. TECK 5", obligatoria:false, sinNA:true,
       preguntas:[
@@ -724,7 +742,7 @@ function construir(){
   let n=0;
   $("#secciones").innerHTML = CONFIG.secciones.map((s,si)=>`
     <div class="card seccion"><h2>${esc(s.titulo)}</h2>
-      ${s.preguntas.map((p,pi)=>{ n++; const id=`q${si}_${pi}`; return `
+      ${s.preguntas.map((p,pi)=>{ n++; const id=`q${si}_${pi}`; const P=typeof p==="string"?{t:p}:p; return `${P.grupo?`<h3 class="preg-grupo">${esc(P.grupo)}</h3>`:""}
       <div class="preg" data-id="${id}" data-n="${n}" data-req="${s.obligatoria===false?0:1}" data-q="${esc(typeof p==="string"?p:p.t)}">
         <div class="preg-tx"><span class="num">${n}.</span>${esc(typeof p==="string"?p:p.t)}${s.obligatoria===false?"":' <span class="req">*</span>'}${typeof p==="string"||!p.d?"":`<div class="preg-d">${esc(p.d)}</div>`}</div>
         <div class="opciones">
@@ -736,8 +754,12 @@ function construir(){
           <button type="button" class="tool t-com">💬 Comentario</button>
           <label class="tool">📎 Adjuntar evidencia <span class="cnt" hidden></span><input type="file" class="c-file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label>
         </div>
-        <div class="c-com"><label class="campo"><span>Comentario <span class="obl">* obligatorio cuando la respuesta es NO</span></span>
-          <textarea class="c-txt" placeholder="Observaciones, desviación detectada, contexto…"></textarea></label></div>
+        ${P.extra?`<div class="xtra" data-res="${esc(P.extra.res||"Detalle")}"><div class="x-lbl">${esc(P.extra.label)} <span class="req">*</span></div>
+          <div class="x-ops">${P.extra.opciones.map(o=>`<label class="x-op"><input type="checkbox" class="x-chk" value="${esc(o)}"> ${esc(o)}</label>`).join("")}</div>
+          ${Object.entries(P.extra.sub||{}).map(([k,v])=>`<div class="x-sub" data-de="${esc(k)}" hidden><div class="x-lbl">${esc(v.label)} <span class="req">*</span></div>
+            <div class="x-ops">${v.opciones.map(o=>`<label class="x-op"><input type="checkbox" class="x-chk-sub" value="${esc(o)}"> ${esc(o)}</label>`).join("")}</div></div>`).join("")}</div>`:""}
+        <div class="c-com"><label class="campo"><span>${P.com?esc(P.com):"Comentario"} <span class="obl">${P.extra?"(opcional)":"* obligatorio cuando la respuesta es NO"}</span></span>
+          <textarea class="c-txt" placeholder="${P.com?esc(P.com)+"…":"Observaciones, desviación detectada, contexto…"}"></textarea></label></div>
         <div class="evids"></div>
         <div class="coment">
           <div style="font-weight:700;color:var(--naranjo-osc);font-size:13.5px">Respuesta NO: se creará un hallazgo PENDIENTE</div>
@@ -765,6 +787,13 @@ document.addEventListener("change", e=>{
   box.classList.remove("error");
 });
 
+document.addEventListener("change", e=>{
+  if(!e.target.matches(".x-chk,.x-chk-sub")) return;
+  const X=e.target.closest(".xtra"), box=e.target.closest(".preg");
+  X.querySelectorAll(".x-sub").forEach(sb=>{ const on=[...X.querySelectorAll(".x-chk")].some(i=>i.checked&&i.value===sb.dataset.de); sb.hidden=!on; if(!on) sb.querySelectorAll("input").forEach(i=>i.checked=false); });
+  X.querySelectorAll(".x-op").forEach(l=>l.classList.toggle("sel", l.querySelector("input").checked));
+  box.classList.remove("error"); box.querySelector(".error-msg").textContent="";
+});
 /* ---------- otros hallazgos (fuera de las preguntas) ---------- */
 const OTRAS_CAT=["Personas","Equipos","Entorno","HCR","PTS","Acciones Correctivas"];
 let NOTRO=0;
@@ -821,11 +850,20 @@ $("#form").addEventListener("submit", e=>{
     const texto = box.dataset.q || box.querySelector(".preg-tx").textContent.replace(/^\d+\.\s*/,"").replace(/\s*\*$/,"").trim();
     let msg="";
     if(!sel && box.dataset.req==="1") msg="Seleccione una respuesta.";
-    else if(sel && sel.value==="NO" && !box.querySelector(".c-txt").value.trim()) msg="El comentario es obligatorio cuando la respuesta es NO.";
+    const X=box.querySelector(".xtra"); let detalle="";
+    if(sel && sel.value==="NO" && X){
+      const m=[...X.querySelectorAll(".x-chk:checked")].map(i=>i.value);
+      const subs=[...X.querySelectorAll(".x-sub:not([hidden])")].map(sb=>({de:sb.dataset.de, v:[...sb.querySelectorAll(".x-chk-sub:checked")].map(i=>i.value)}));
+      if(!m.length) msg="Marque al menos una opción.";
+      else if(subs.some(s=>!s.v.length)) msg="Indique cuáles: "+subs.filter(s=>!s.v.length).map(s=>s.de).join(", ")+".";
+      detalle=m.map(x=>{ const s=subs.find(s=>s.de===x); return s&&s.v.length? `${x} (${s.v.join(", ")})` : x; }).join(", ");
+      if(detalle) detalle=X.dataset.res+": "+detalle+".";
+    }
+    else if(sel && sel.value==="NO" && !box.querySelector(".c-txt").value.trim()) msg=box.querySelector(".c-com .campo > span").firstChild.textContent.trim()==="Comentario"?"El comentario es obligatorio cuando la respuesta es NO.":"Complete: "+box.querySelector(".c-com .campo > span").firstChild.textContent.trim()+".";
     err.textContent=msg; box.classList.toggle("error", !!msg);
     if(msg && !primerError) primerError=box;
     respuestas.push({n:+box.dataset.n, pregunta:texto, valor:sel?sel.value:"",
-      comentario: box.querySelector(".c-txt").value.trim(),
+      comentario: [detalle, box.querySelector(".c-txt").value.trim()].filter(Boolean).join(" "),
       prioridad: box.querySelector(".c-prio").value,
       plazo: box.querySelector(".c-plazo").value,
       seccion: box.closest(".seccion").querySelector("h2").textContent,
@@ -866,7 +904,7 @@ function limpiar(){
   $("#form").reset(); $("#g_fecha").value=hoy();
   document.querySelectorAll(".preg").forEach(b=>{ b.classList.remove("error","esno"); b.querySelector(".coment").classList.remove("ver");
     b.querySelector(".c-com").classList.remove("ver"); b.querySelector(".t-com").classList.remove("on");
-    b.querySelectorAll(".sel").forEach(l=>l.classList.remove("sel")); pintarEvidPreg(b); });
+    b.querySelectorAll(".sel").forEach(l=>l.classList.remove("sel")); b.querySelectorAll(".x-sub").forEach(x=>x.hidden=true); pintarEvidPreg(b); });
   reiniciarOtros();
   document.querySelectorAll("#datosGenerales input,#datosGenerales select").forEach(el=>el.style.borderColor="");
 }
