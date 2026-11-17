@@ -553,7 +553,7 @@ const CONFIG = {
         {t:"¿Los peligros están correctamente evaluados?", grupo:"Identificación de peligros",
           extra:{label:"Indique qué peligros no se encontraban identificados", res:"Peligros no identificados", opciones:["Peligros geotécnicos","Peligros asociados a los equipos","Trabajos cruzados","Energías","Procesos"],
             sub:{"Energías":{label:"¿Qué energías?", opciones:["Cinética","Potencial","Térmica","Eléctrica","Hidráulica","Mecánica","Elástica"]}}}},
-        "¿Las medidas de control son acordes al peligro identificado?",
+        {t:"¿Las medidas de control son acordes al peligro identificado?", si:"CUMPLE", no:"NO CUMPLE"},
         "¿Las medidas de control son efectivas?",
         {t:"¿El personal comprende las medidas de control?", com:"Indique cuáles medidas de control no comprenden"}
       ]},
@@ -774,8 +774,8 @@ function construir(){
       <div class="preg" data-id="${id}" data-n="${n}" data-req="${s.obligatoria===false?0:1}" data-q="${esc(typeof p==="string"?p:p.t)}">
         <div class="preg-tx"><span class="num">${n}.</span>${esc(typeof p==="string"?p:p.t)}${s.obligatoria===false?"":' <span class="req">*</span>'}${typeof p==="string"||!p.d?"":`<div class="preg-d">${esc(p.d)}</div>`}</div>
         <div class="opciones">
-          <label class="si"><input type="radio" name="${id}" value="SI"> SÍ</label>
-          <label class="no"><input type="radio" name="${id}" value="NO"> NO</label>
+          <label class="si"><input type="radio" name="${id}" value="SI"> ${esc(P.si||"SÍ")}</label>
+          <label class="no"><input type="radio" name="${id}" value="NO"> ${esc(P.no||"NO")}</label>
           ${s.sinNA?"":`<label class="na"><input type="radio" name="${id}" value="NA"> N/A</label>`}
         </div>
         <div class="herr">
