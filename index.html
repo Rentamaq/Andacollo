@@ -196,9 +196,9 @@
   .db-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:14px}
   .db-grid .card{margin:0}
   .pz{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-  .pz svg{width:160px;height:160px;flex-shrink:0}
-  .pz svg path,.pz svg circle{stroke:#fff;stroke-width:2;cursor:default}
-  .pz svg path:hover,.pz svg circle:hover{opacity:.85}
+  .pz svg{width:200px;height:auto;flex-shrink:0;overflow:visible}
+  .pz svg path,.pz svg ellipse:not(.brillo):not(.sombra){stroke:#fff;stroke-width:1.2;stroke-linejoin:round;cursor:default}
+  .pz svg path:hover{opacity:.88}
   .pz-ley{flex:1;min-width:150px;list-style:none;margin:0;padding:0;font-size:13px}
   .pz-ley li{display:flex;align-items:center;gap:7px;padding:3px 0;border-bottom:1px solid #F0F0F0}
   .pz-ley i{width:11px;height:11px;border-radius:3px;flex-shrink:0}
@@ -1308,16 +1308,26 @@ function barra(c,p,v,max){
   return `<div class="db-bar-w"><div class="db-bar" style="flex:1">${seg("c",c,"Cerrados")}${seg("p",p,"Pendientes en plazo")}${seg("v",v,"Vencidos")}</div><b>${tot}</b></div>`;
 }
 const LEY='<span><i style="background:var(--verde)"></i>Cerrados</span><span><i style="background:var(--naranjo)"></i>Pendientes en plazo</span><span><i style="background:var(--rojo)"></i>Vencidos</span>';
+let PZN=0;
+const oscurecer=(c,f)=>{ const m=/^#?([0-9a-f]{6})$/i.exec(c); if(!m) return c; const n=parseInt(m[1],16);
+  return "#"+[16,8,0].map(s=>Math.round(((n>>s)&255)*f).toString(16).padStart(2,"0")).join(""); };
 function torta(S, unidad){
   S=S.filter(s=>s.n>0); const tot=S.reduce((a,s)=>a+s.n,0);
   if(!tot) return '<div class="db-vacio">Sin datos para estos filtros.</div>';
-  const R=80, C=85; let ang=-Math.PI/2, svg="";
+  const RX=88, RY=50, D=22, CX=95, CY=56, g="pzg"+(++PZN);
+  const P=(a,dy=0)=>`${(CX+RX*Math.cos(a)).toFixed(2)},${(CY+RY*Math.sin(a)+dy).toFixed(2)}`;
   const pc=n=>Math.round(n/tot*100)+"%";
-  S.forEach(s=>{ const a=s.n/tot*2*Math.PI, tit=`<title>${esc(s.nombre)}: ${s.n} (${pc(s.n)})</title>`;
-    if(S.length===1){ svg+=`<circle cx="${C}" cy="${C}" r="${R}" fill="${s.color}">${tit}</circle>`; return; }
-    const x1=C+R*Math.cos(ang), y1=C+R*Math.sin(ang); ang+=a; const x2=C+R*Math.cos(ang), y2=C+R*Math.sin(ang);
-    svg+=`<path d="M${C},${C} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${a>Math.PI?1:0} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${s.color}">${tit}</path>`; });
-  return `<div class="pz"><svg viewBox="0 0 170 170" role="img" aria-label="Gráfico de torta">${svg}</svg>
+  let ang=-Math.PI/2, lados="", tapas="";
+  S.forEach(s=>{ const a=s.n/tot*2*Math.PI, a0=ang, a1=ang+a; ang=a1;
+    const tit=`<title>${esc(s.nombre)}: ${s.n} (${pc(s.n)})</title>`, osc=oscurecer(s.color,.72);
+    const f0=Math.max(a0,0), f1=Math.min(a1,Math.PI);
+    if(f1>f0) lados+=`<path d="M${P(f0)} A${RX},${RY} 0 0 1 ${P(f1)} L${P(f1,D)} A${RX},${RY} 0 0 0 ${P(f0,D)} Z" fill="${osc}">${tit}</path>`;
+    if(S.length===1){ tapas+=`<ellipse cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}" fill="${s.color}">${tit}</ellipse>`; return; }
+    tapas+=`<path d="M${CX},${CY} L${P(a0)} A${RX},${RY} 0 ${a>Math.PI?1:0} 1 ${P(a1)} Z" fill="${s.color}">${tit}</path>`; });
+  const svg=`<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+    <ellipse class="sombra" cx="${CX}" cy="${CY+D+6}" rx="${RX}" ry="${RY*.5}" fill="#000" opacity=".08"/>${lados}${tapas}
+    <ellipse class="brillo" cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}" fill="url(#${g})" pointer-events="none"/>`;
+  return `<div class="pz"><svg viewBox="0 0 190 ${CY+RY+D+16}" role="img" aria-label="Gráfico de torta 3D">${svg}</svg>
     <ul class="pz-ley">${S.map(s=>`<li><i style="background:${s.color}"></i><span title="${esc(s.nombre)}">${esc(s.nombre)}</span><b>${s.n}</b><em>${pc(s.n)}</em></li>`).join("")}</ul></div>
     <div class="pz-tot">Total: ${tot} ${unidad}</div>`;
 }
