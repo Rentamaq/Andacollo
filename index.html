@@ -553,9 +553,9 @@ const CONFIG = {
         {t:"¿Los peligros están correctamente evaluados?", si:"CUMPLE", no:"NO CUMPLE", grupo:"Identificación de peligros",
           extra:{label:"Indique qué peligros no se encontraban identificados", res:"Peligros no identificados", opciones:["Peligros geotécnicos","Peligros asociados a los equipos","Trabajos cruzados","Energías","Procesos"],
             sub:{"Energías":{label:"¿Qué energías?", opciones:["Cinética","Potencial","Térmica","Eléctrica","Hidráulica","Mecánica","Elástica"]}}}},
-        "¿Las medidas de control son acordes al peligro identificado?",
-        "¿Las medidas de control son efectivas?",
-        {t:"¿El personal comprende las medidas de control?", com:"Indique cuáles medidas de control no comprenden"}
+        {t:"¿Las medidas de control son acordes al peligro identificado?", si:"CUMPLE", no:"NO CUMPLE"},
+        {t:"¿Las medidas de control son efectivas?", si:"CUMPLE", no:"NO CUMPLE"},
+        {t:"¿El personal comprende las medidas de control?", si:"CUMPLE", no:"NO CUMPLE", com:"Indique cuáles medidas de control no comprenden"}
       ]},
     { titulo:"7. TECK 5", obligatoria:false, sinNA:true,
       preguntas:[
