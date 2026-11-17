@@ -550,10 +550,10 @@ const CONFIG = {
         {t:"¿Se encuentra completa su HCR?",
           extra:{label:"Si la respuesta es NO, indique qué faltaba", res:"Faltaba", opciones:["Fecha","Nombre","Nombre de la actividad","Firma"]}},
         "¿Es legible la HCR?",
-        {t:"¿Los peligros están correctamente evaluados?", grupo:"Identificación de peligros",
+        {t:"¿Los peligros están correctamente evaluados?", si:"CUMPLE", no:"NO CUMPLE", grupo:"Identificación de peligros",
           extra:{label:"Indique qué peligros no se encontraban identificados", res:"Peligros no identificados", opciones:["Peligros geotécnicos","Peligros asociados a los equipos","Trabajos cruzados","Energías","Procesos"],
             sub:{"Energías":{label:"¿Qué energías?", opciones:["Cinética","Potencial","Térmica","Eléctrica","Hidráulica","Mecánica","Elástica"]}}}},
-        {t:"¿Las medidas de control son acordes al peligro identificado?", si:"CUMPLE", no:"NO CUMPLE"},
+        "¿Las medidas de control son acordes al peligro identificado?",
         "¿Las medidas de control son efectivas?",
         {t:"¿El personal comprende las medidas de control?", com:"Indique cuáles medidas de control no comprenden"}
       ]},
