@@ -751,7 +751,14 @@ async function traerHallazgos(){
         if(!l){ DB.hallazgos.push({...s, evid:[], evidCierre:[]}); cambio=true; return; }
         ["estado","responsable","plazo","cierre","fechaCierre","prioridad","comentario","enlaces","enlacesCierre","fecha","verificador","area","lider"].concat("revision" in s?["revision"]:[]).forEach(k=>{ if((l[k]||"")!==(s[k]||"")){ l[k]=s[k]; cambio=true; } });
       });
-      if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true; }
+      if(Array.isArray(d.inspecciones)){ DB.inspecciones=d.inspecciones; cambio=true;
+        // Recupera "Trabajador evaluado" de inspecciones enviadas con el script antiguo: si el servidor (nuevo) lo tiene vacío
+        // y este equipo lo guardó, se reenvía el registro y el script completa la columna M.
+        const enCola=new Set(COLA.filter(c=>c.tipo==="registro").map(c=>c.id)); let rec=0;
+        d.inspecciones.forEach(x=>{ if(!("trabajador" in x) || x.trabajador || enCola.has(x.id)) return;
+          const r=DB.registros.find(y=>y.id===x.id); if(r && r.datos && r.datos.trabajador){ COLA.push({tipo:"registro", id:r.id}); rec++; } });
+        if(rec){ guardarCola(); setTimeout(sincronizar, 500); }
+      }
       COLA.filter(c=>c.tipo==="editarRegistro").forEach(aplicarEdicion);
       if(Array.isArray(d.eliminados) && d.eliminados.length){ if(quitarLocal(new Set(d.eliminados))) cambio=true; }
       if(cambio){ guardar(); renderHall(); renderDash(); }
