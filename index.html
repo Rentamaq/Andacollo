@@ -84,6 +84,8 @@
   tr:hover td{background:#FAFAFA}
   .estado{display:inline-block;font-weight:700;font-size:12px;padding:3px 10px;border-radius:12px;white-space:nowrap}
   .estado.PENDIENTE{background:var(--naranjo-claro);color:var(--naranjo-osc);border:1px solid var(--naranjo)}
+  .estado.GESTION{background:#E3EEFB;color:#1F5FAF;border:1px solid #2A78D6}
+  html[data-tema=oscuro] .estado.GESTION{background:#17263A;color:#7FB2F0;border-color:#4F8FDB}
   .estado.CERRADO{background:var(--verde-claro);color:var(--verde);border:1px solid var(--verde)}
   .prio{font-weight:700}
   .prio.Crítica{color:var(--rojo)} .prio.Alta{color:var(--naranjo-osc)}
@@ -342,7 +344,7 @@
       <div class="actualiz" id="hallActualiz"></div>
       <div class="filtros">
         <label class="campo">Estado
-          <select id="fEstado"><option value="">Todos</option><option>PENDIENTE</option><option>CERRADO</option></select>
+          <select id="fEstado"><option value="">Todos</option><option>PENDIENTE</option><option>EN GESTIÓN</option><option>CERRADO</option></select>
         </label>
         <label class="campo">Prioridad
           <select id="fPrio"><option value="">Todas</option><option>Crítica</option><option>Alta</option><option>Mejora</option></select>
@@ -445,6 +447,7 @@
         <div class="evids" id="dEvids" style="margin-top:8px"></div>
       </div>
       <div class="error-msg" id="dErr" style="display:none">Para CERRAR indique la medida aplicada / evidencia.</div>
+      <div class="error-msg" id="dErrRev" style="display:none">Para dejarlo EN GESTIÓN indique la nueva fecha de revisión.</div>
     </div>
     <div class="dlg-f">
       <button class="btn sec" value="cancel" formnovalidate>Cancelar</button>
@@ -1046,6 +1049,8 @@ $("#tbInsp").addEventListener("click", e=>{
   toast("Inspección eliminada.");
 });
 ["#iArea","#iDesde","#iHasta","#iTexto"].forEach(s=>$(s).addEventListener("input", renderInsp));
+const estadoTxt = h => h.estado==="CERRADO" ? "CERRADO" : (h.revision ? "EN GESTIÓN" : (h.estado||""));
+const badgeEstado = h => { const g=estadoTxt(h)==="EN GESTIÓN"; return `<span class="estado ${h.estado}${g?" GESTION":""}">${estadoTxt(h)}</span>`; };
 const vencido = h => h.estado==="PENDIENTE" && h.plazo && h.plazo < hoy();
 const dif = (a,b) => Math.round((Date.parse(a+"T12:00:00")-Date.parse(b+"T12:00:00"))/864e5);
 const pl = n => n+" día"+(n===1?"":"s");
@@ -1070,7 +1075,7 @@ const HF_COLS={
     area:{t:"Área / Lugar",v:h=>h.area||"(vacío)"}, preg:{t:"Pregunta (desviación)",v:h=>h.pregunta||"(vacío)"}, com:{t:"Comentario",v:h=>String(h.comentario||"").trim()||"(vacío)"},
     prio:{t:"Prioridad",v:h=>h.prioridad||"(vacío)",s:h=>({"Crítica":0,"Alta":1,"Mejora":2})[h.prioridad]??3},
     resp:{t:"Responsable",v:h=>String(h.responsable||"").trim()||"(vacío)"},
-    plazo:{t:"Plazo",v:sitPlazo,s:h=>h.plazo||"9999",sub:"Situación del plazo"}, estado:{t:"Estado",v:h=>h.estado||"(vacío)"} } };
+    plazo:{t:"Plazo",v:sitPlazo,s:h=>h.plazo||"9999",sub:"Situación del plazo"}, estado:{t:"Estado",v:h=>estadoTxt(h)||"(vacío)"} } };
 let HALL_VISTA=[];
 const HF={insp:{f:{},o:null}, hall:{f:{},o:null}}, HF_BASE={insp:[],hall:[]};
 const hfCmp=(a,b)=> (typeof a==="number"&&typeof b==="number") ? a-b : String(a??"").localeCompare(String(b??""),"es",{numeric:true,sensitivity:"base"});
@@ -1133,7 +1138,7 @@ function renderHall(){
   $("#kTotal").textContent=H.length; $("#kPend").textContent=pend.length;
   $("#kCerr").textContent=H.length-pend.length; $("#kCrit").textContent=pend.filter(h=>h.prioridad==="Crítica").length;
   $("#badgePend").textContent=pend.length;
-  let L=H.filter(h=>(!FILTRO_INSP||h.registro===FILTRO_INSP)&&(!fe||h.estado===fe)&&(!fp||h.prioridad===fp)&&
+  let L=H.filter(h=>(!FILTRO_INSP||h.registro===FILTRO_INSP)&&(!fe||estadoTxt(h)===fe)&&(!fp||h.prioridad===fp)&&
     (!ft||[h.pregunta,h.comentario,h.responsable,h.area,h.lider,h.id].join(" ").toLowerCase().includes(ft)))
     .sort((a,b)=>(a.estado===b.estado?0:a.estado==="PENDIENTE"?-1:1)||b.id.localeCompare(a.id));
   HF_BASE.hall=L; L=hfAplicar("hall",L); HALL_VISTA=L; const ordCol=!!HF.hall.o;
@@ -1148,11 +1153,11 @@ function renderHall(){
     <td><b>${esc(h.verificador)||"—"}</b></td>
     <td><button class="lnk" type="button" data-rep="${esc(h.registro)}" title="Abrir el reporte de la inspección">${esc(h.area)||"Ver"} ›</button>${h.lider?`<br><span class="nota">Supervisor: ${esc(h.lider)}</span>`:""}</td>
     <td>${esc(h.pregunta)}</td>
-    <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>Cierre:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
+    <td>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}${h.cierre?`<div class="nota" style="margin-top:6px"><b>${h.estado==="CERRADO"?"Cierre":"Avance"}:</b> ${esc(h.cierre)}</div>`:""}${(h.evidCierre||[]).length?`<div class="evids">${thumbs(h.evidCierre,{sm:1})}</div>`:enlaces(h.enlacesCierre,"Cierre")}</td>
     <td class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</td>
     <td>${esc(h.responsable)||'<span class="nota">—</span>'}</td>
     <td style="white-space:nowrap${vencido(h)?";color:var(--rojo);font-weight:700":""}">${fmt(h.plazo)||'<span class="nota">—</span>'}${diasPlazo(h)}${h.estado!=="CERRADO"&&h.revision?`<div class="dias rev">🔎 Revisión ${fmt(h.revision)}</div>`:""}</td>
-    <td><span class="estado ${h.estado}">${h.estado}</span>${h.fechaCierre?`<br><span class="nota">${fmt(h.fechaCierre)}</span>`:""}</td>
+    <td>${badgeEstado(h)}${h.fechaCierre?`<br><span class="nota">${fmt(h.fechaCierre)}</span>`:""}</td>
     <td style="white-space:nowrap"><button class="btn sec peq" data-edit="${esc(h.id)}">${ADMIN?"Editar":h.estado==="PENDIENTE"?"Cerrar":"Ver"}</button>
       <button class="btn-del solo-admin" type="button" data-del-hall="${esc(h.id)}" title="Eliminar hallazgo">🗑</button></td></tr>`;
   $("#tbHall").innerHTML = G.length ? G.map(([k,hs])=>{ const i=infoInsp(k), np=hs.filter(h=>h.estado==="PENDIENTE").length;
@@ -1171,7 +1176,7 @@ function infoInsp(id){
 function hallDeInsp(id){
   const hs=DB.hallazgos.filter(h=>h.registro===id); if(!hs.length) return "";
   return `<div class="det-sec">Hallazgos de esta inspección (${hs.length})</div>`+hs.map(h=>`<div class="det-preg">
-    <b>${esc(h.id)}</b> · ${esc(h.pregunta)} <span class="estado ${h.estado}">${h.estado}</span>
+    <b>${esc(h.id)}</b> · ${esc(h.pregunta)} ${badgeEstado(h)}
     <div class="nota" style="margin-top:4px">💬 ${esc(h.comentario)}</div>
     <div class="nota">Prioridad <b class="prio ${esc(h.prioridad)}">${esc(h.prioridad)}</b> · Responsable <b>${esc(h.responsable)||"—"}</b> · Plazo <b>${fmt(h.plazo)||"—"}</b>${h.estado!=="CERRADO"&&h.revision?` · Revisión <b>${fmt(h.revision)}</b>`:""}</div>${diasPlazo(h)}
     ${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:enlaces(h.enlaces,"Evidencia")}
@@ -1298,7 +1303,7 @@ $("#tbHall").addEventListener("click", e=>{
   $("#dlgPreg").innerHTML=`<div class="nota">Levantado por <b>${esc(h.verificador)||"—"}</b> · ${fmt(h.fecha)} · ${esc(h.area)}${h.lider?" · Supervisor "+esc(h.lider):""}</div><b>${esc(h.pregunta)}</b><br>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:""}`;
   hidratar($("#dlgPreg")); DLG_EV=(h.evidCierre||[]).slice(); pintarEvidDlg();
   $("#dEstado").value=h.estado; $("#dResp").value=h.responsable; $("#dPlazo").value=h.plazo;
-  $("#dCierre").value=h.cierre; $("#dFechaCierre").value=h.fechaCierre; $("#dRevision").value=h.revision||""; $("#dErr").style.display="none";
+  $("#dCierre").value=h.cierre; $("#dFechaCierre").value=h.fechaCierre; $("#dRevision").value=h.revision||""; $("#dErr").style.display="none"; $("#dErrRev").style.display="none";
   pintarEstadoDlg();
   // Sin clave: la desviación, el responsable y el plazo no se editan; solo se puede cerrar un hallazgo PENDIENTE.
   $("#dResp").disabled = $("#dPlazo").disabled = !ADMIN;
@@ -1312,6 +1317,7 @@ function pintarEstadoDlg(){ const g=$("#dEstado").value!=="CERRADO"; $("#dRevBox
 $("#dEstado").addEventListener("change",()=>{ if($("#dEstado").value==="CERRADO" && !$("#dFechaCierre").value) $("#dFechaCierre").value=hoy(); pintarEstadoDlg(); });
 $("#dGuardar").addEventListener("click", e=>{
   if($("#dEstado").value==="CERRADO" && !$("#dCierre").value.trim()){ e.preventDefault(); $("#dErr").style.display="block"; return; }
+  if($("#dEstado").value!=="CERRADO" && !$("#dRevision").value && !$("#dRevision").disabled && !ADMIN){ e.preventDefault(); $("#dErrRev").style.display="block"; return; }
   const h=DB.hallazgos.find(x=>x.id===editId);
   if(DLG_SOLO){ e.preventDefault(); return; }
   h.estado=$("#dEstado").value;
@@ -1465,7 +1471,7 @@ function excelDashboard(){
     {nombre:"Por supervisor", anchos, filas:[["Supervisor del área",...cab.slice(1)],...sup,tot], negritas:[sup.length+1]},
     {nombre:"Desviaciones", anchos:[60,10,10,12,12], filas:[["Desviación","Veces","Cerrados","Pendientes","% del total"],...top]},
     {nombre:"Hallazgos", anchos:[14,11,22,20,22,40,45,10,22,11,11,26,14,40,12], filas:[["N°","Fecha","Levantado por","Área / Lugar","Supervisor","Desviación","Comentario","Prioridad","Responsable","Plazo","Estado","Situación del plazo","Nueva fecha de revisión","Medida de cierre","Fecha cierre"],
-      ...H.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado==="CERRADO"?"CERRADO":"EN GESTIÓN",sitH(h),h.estado==="CERRADO"?"":fmt(h.revision),h.cierre,fmt(h.fechaCierre)])]},
+      ...H.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),estadoTxt(h),sitH(h),h.estado==="CERRADO"?"":fmt(h.revision),h.cierre,fmt(h.fechaCierre)])]},
     {nombre:"Inspecciones", anchos:[11,24,20,26,24,7,7,7,14,10], filas:[["Fecha","Quien inspecciona","Área / Lugar","Supervisor del área","Trabajador evaluado","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
       ...I.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(x=>[fmt(x.fecha),x.verificador,x.area,x.lider,x.trabajador||"",+x.si||0,+x.no||0,+x.na||0,(x.pct===null||x.pct===""||isNaN(x.pct))?"":{pct:+x.pct},x.hall])]}
   ];
@@ -1499,7 +1505,7 @@ function descargar(nombre, contenido, tipo){
 const csv = filas => "﻿"+filas.map(f=>f.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n");
 $("#btnCsv").onclick=()=>descargar(`hallazgos_${hoy()}.csv`, csv([
   ["N°","Fecha","Quien inspecciona","Área","Supervisor del área","Pregunta","Comentario","Prioridad","Responsable","Plazo","Estado","Nueva fecha de revisión","Medida/Evidencia de cierre","Fecha cierre","Evidencias hallazgo","Evidencias cierre"],
-  ...HALL_VISTA.map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),h.estado==="CERRADO"?"CERRADO":"EN GESTIÓN",h.estado==="CERRADO"?"":fmt(h.revision),h.cierre,fmt(h.fechaCierre),(h.evid||[]).map(v=>v.name).join(", "),(h.evidCierre||[]).map(v=>v.name).join(", ")])
+  ...HALL_VISTA.map(h=>[h.id,fmt(h.fecha),h.verificador,h.area,h.lider,h.pregunta,h.comentario,h.prioridad,h.responsable,fmt(h.plazo),estadoTxt(h),h.estado==="CERRADO"?"":fmt(h.revision),h.cierre,fmt(h.fechaCierre),(h.evid||[]).map(v=>v.name).join(", "),(h.evidCierre||[]).map(v=>v.name).join(", ")])
 ]),"text/csv;charset=utf-8");
 $("#btnCsvInsp").onclick=()=>descargar(`inspecciones_${hoy()}.csv`, csv([
   ["Fecha","Supervisor del área","Trabajador evaluado","Área","Quien inspecciona","SÍ","NO","N/A","% cumplimiento","Hallazgos"],
