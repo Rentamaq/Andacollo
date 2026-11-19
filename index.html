@@ -88,6 +88,7 @@
   html[data-tema=oscuro] .estado.GESTION{background:#17263A;color:#7FB2F0;border-color:#4F8FDB}
   .estado.CERRADO{background:var(--verde-claro);color:var(--verde);border:1px solid var(--verde)}
   .prio{font-weight:700}
+  .adm-box{border:1px dashed var(--naranjo);border-radius:10px;padding:10px 12px;margin:10px 0;background:rgba(232,131,5,.06)} .adm-t{font-weight:700;color:var(--naranjo-osc);margin-bottom:6px}
   .prio.Crítica{color:var(--rojo)} .prio.Alta{color:var(--naranjo-osc)}
   .vacio{text-align:center;color:var(--gris-2);padding:30px}
   dialog{border:0;border-radius:10px;padding:0;max-width:560px;width:calc(100% - 32px)}
@@ -353,6 +354,7 @@
           <input type="text" id="fTexto" placeholder="Pregunta, comentario, supervisor, responsable…">
         </label>
         <button class="btn sec" id="btnTraer" type="button">↻ Actualizar</button>
+        <button class="btn sec" id="btnAdmin" type="button">🔑 Administrador</button>
         <button class="btn sec" id="btnCsv" type="button">Exportar a Excel (CSV)</button>
         <button class="btn" id="btnPdf" type="button">📄 Informe PDF</button>
       </div>
@@ -430,6 +432,14 @@
     <div class="dlg-h" id="dlgTit">Actualizar hallazgo</div>
     <div class="dlg-b">
       <div class="nota" id="dlgPreg"></div>
+      <div id="dAdmBox" class="adm-box">
+        <div class="adm-t">🔑 Edición de administrador</div>
+        <label class="campo">Prioridad<select id="dPrio"><option>Crítica</option><option>Alta</option><option>Mejora</option></select></label>
+        <label class="campo">Desviación / comentario del hallazgo<textarea id="dComent"></textarea></label>
+        <label class="tool">📷 Agregar fotos al hallazgo<input type="file" id="dFileH" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label>
+        <div class="evids" id="dEvidsH" style="margin-top:8px"></div>
+        <div id="dEnlH"></div>
+      </div>
       <label class="campo">Estado
         <select id="dEstado"><option value="PENDIENTE">PENDIENTE</option><option value="GESTION">EN GESTIÓN</option><option value="CERRADO">CERRADO</option></select>
       </label>
@@ -445,6 +455,7 @@
       <div>
         <label class="tool">📎 Adjuntar evidencia de cierre<input type="file" id="dFile" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf" multiple hidden></label>
         <div class="evids" id="dEvids" style="margin-top:8px"></div>
+        <div id="dEnlC"></div>
       </div>
       <div class="error-msg" id="dErr" style="display:none">Para CERRAR indique la medida aplicada / evidencia.</div>
       <div class="error-msg" id="dErrRev" style="display:none">Para dejarlo EN GESTIÓN indique la nueva fecha de revisión.</div>
@@ -640,17 +651,19 @@ async function verEvid(id){
 }
 let PEND={};          // evidencias del formulario en curso: {preguntaId:[ref]}
 let DLG_EV=[];        // evidencias de cierre en el diálogo
+let DLG_EVH=[];       // fotos del hallazgo (edición de administrador)
 function pintarEvidPreg(box){
   const q=box.dataset.id, L=PEND[q]||[], cont=box.querySelector(".evids");
   cont.innerHTML=thumbs(L,{del:"q:"+q}); hidratar(cont);
   const c=box.querySelector(".cnt"); c.hidden=!L.length; c.textContent=L.length;
 }
 let DLG_SOLO=false;
-function pintarEvidDlg(){ const c=$("#dEvids"); c.innerHTML=thumbs(DLG_EV, DLG_SOLO?{}:{del:"dlg"}); hidratar(c); }
+function pintarEvidDlg(){ const c=$("#dEvids"); c.innerHTML=thumbs(DLG_EV, DLG_SOLO?{}:{del:"dlg"}); hidratar(c); const h=$("#dEvidsH"); h.innerHTML=thumbs(DLG_EVH,{del:"dlgh"}); hidratar(h); }
 document.addEventListener("click", e=>{
   const x=e.target.closest("[data-del]");
   if(x){ e.preventDefault(); e.stopPropagation(); const id=x.dataset.del, ctx=x.dataset.ctx;
     if(ctx==="dlg"){ DLG_EV=DLG_EV.filter(v=>v.id!==id); pintarEvidDlg(); }
+    else if(ctx==="dlgh"){ DLG_EVH=DLG_EVH.filter(v=>v.id!==id); pintarEvidDlg(); }
     else { const q=ctx.slice(2); PEND[q]=(PEND[q]||[]).filter(v=>v.id!==id); const bx=document.querySelector(`[data-id="${q}"]`); if(bx) pintarEvidPreg(bx); IDB.del(id); }
     return; }
   const ev=e.target.closest(".evid"); if(ev){ e.preventDefault(); verEvid(ev.dataset.ev); return; }
@@ -660,11 +673,12 @@ document.addEventListener("click", e=>{
     tc.classList.toggle("on", cc.classList.contains("ver")); if(cc.classList.contains("ver")) cc.querySelector("textarea").focus(); }
 });
 document.addEventListener("change", async e=>{
-  if(!e.target.classList.contains("c-file") && e.target.id!=="dFile") return;
+  if(!e.target.classList.contains("c-file") && e.target.id!=="dFile" && e.target.id!=="dFileH") return;
   const files=[...e.target.files]; e.target.value=""; if(!files.length) return;
   toast("Procesando evidencia…");
   const refs=(await Promise.all(files.map(procesarArchivo))).filter(Boolean);
   if(e.target.id==="dFile"){ DLG_EV.push(...refs); pintarEvidDlg(); }
+  else if(e.target.id==="dFileH"){ DLG_EVH.push(...refs); pintarEvidDlg(); }
   else { const box=e.target.closest(".preg,.otro"); (PEND[box.dataset.id] ||= []).push(...refs); pintarEvidPreg(box); }
   toast(`${refs.length} evidencia(s) adjuntada(s).`);
 });
@@ -969,15 +983,20 @@ function activarTab(t){
   if(t.dataset.vista==="v-dash"){ renderDash(); traerHallazgos(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
-  if(t.dataset.vista==="v-reg" && !ADMIN){ $("#pinIn").value=""; $("#pinErr").style.display="none"; $("#dlgPin").showModal(); $("#pinIn").focus(); return; }
+  if(t.dataset.vista==="v-reg" && !ADMIN){ PIN_SEG=false; $("#pinIn").value=""; $("#pinErr").style.display="none"; $("#dlgPin").showModal(); $("#pinIn").focus(); return; }
   activarTab(t);
 });
+let PIN_SEG=false;
+function pintarBtnAdmin(){ const b=$("#btnAdmin"); if(b){ b.textContent = ADMIN ? "🔓 Administrador activo" : "🔑 Administrador"; b.disabled=ADMIN; } }
+$("#btnAdmin").addEventListener("click", ()=>{ if(ADMIN) return; PIN_SEG=true; $("#pinIn").value=""; $("#pinErr").style.display="none"; $("#dlgPin").showModal(); $("#pinIn").focus(); });
+pintarBtnAdmin();
 $("#pinOk").addEventListener("click", async e=>{
   e.preventDefault();
   let ok=false; try{ ok = (await sha256($("#pinIn").value.trim())) === PIN_HASH; }catch(err){ toast("Este navegador no permite validar la clave."); }
   if(!ok){ $("#pinErr").style.display="block"; return; }
   ADMIN=true; renderHall(); ss.set(KEY+"_admin","1"); ss.set(KEY+"_clave",$("#pinIn").value.trim()); document.body.classList.add("admin"); $("#dlgPin").close();
-  document.querySelector('.tab[data-vista="v-reg"]').textContent="Registros";
+  document.querySelector('.tab[data-vista="v-reg"]').textContent="Registros"; pintarBtnAdmin();
+  if(PIN_SEG){ PIN_SEG=false; toast("Modo administrador activo: use Editar en cada hallazgo."); return; }
   activarTab(document.querySelector('.tab[data-vista="v-reg"]'));
 });
 
@@ -1308,7 +1327,12 @@ $("#tbHall").addEventListener("click", e=>{
   const soloVer = !ADMIN && h.estado==="CERRADO";
   $("#dlgTit").textContent=(ADMIN?"Actualizar":soloVer?"Detalle":"Cerrar")+" hallazgo "+id;
   $("#dlgPreg").innerHTML=`<div class="nota">Levantado por <b>${esc(h.verificador)||"—"}</b> · ${fmt(h.fecha)} · ${esc(h.area)}${h.lider?" · Supervisor "+esc(h.lider):""}</div><b>${esc(h.pregunta)}</b><br>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:""}`;
-  hidratar($("#dlgPreg")); DLG_EV=(h.evidCierre||[]).slice(); pintarEvidDlg();
+  hidratar($("#dlgPreg")); DLG_EV=(h.evidCierre||[]).slice(); DLG_EVH=(h.evid||[]).slice();
+  $("#dAdmBox").style.display = ADMIN ? "" : "none";
+  if(ADMIN){ $("#dPrio").value=h.prioridad||"Alta"; $("#dComent").value=h.comentario||""; }
+  // Fotos ya guardadas en Drive (se ven en cualquier equipo); las nuevas se suman a estas.
+  $("#dEnlH").innerHTML = enlaces(h.enlaces,"Foto hallazgo en Drive"); $("#dEnlC").innerHTML = enlaces(h.enlacesCierre,"Evidencia de cierre en Drive");
+  pintarEvidDlg();
   $("#dEstado").value = h.estado==="CERRADO" ? "CERRADO" : (h.revision ? "GESTION" : "PENDIENTE"); $("#dResp").value=h.responsable; $("#dPlazo").value=h.plazo;
   $("#dCierre").value=h.cierre; $("#dFechaCierre").value=h.fechaCierre; $("#dRevision").value=h.revision||""; $("#dErr").style.display="none"; $("#dErrRev").style.display="none";
   pintarEstadoDlg();
@@ -1328,7 +1352,7 @@ $("#dGuardar").addEventListener("click", e=>{
   const h=DB.hallazgos.find(x=>x.id===editId);
   if(DLG_SOLO){ e.preventDefault(); return; }
   const vEst=$("#dEstado").value; h.estado = vEst==="CERRADO" ? "CERRADO" : "PENDIENTE";
-  if(ADMIN){ h.responsable=$("#dResp").value.trim(); h.plazo=$("#dPlazo").value; }
+  if(ADMIN){ h.responsable=$("#dResp").value.trim(); h.plazo=$("#dPlazo").value; h.prioridad=$("#dPrio").value; h.comentario=$("#dComent").value.trim()||h.comentario; h.evid=DLG_EVH.slice(); (h.evid||[]).forEach(v=>encolar("evidencia",v.id)); }
   h.evidCierre=DLG_EV.slice();
   h.cierre=$("#dCierre").value.trim(); h.fechaCierre = h.estado==="CERRADO" ? ($("#dFechaCierre").value||hoy()) : "";
   h.revision = vEst==="GESTION" ? $("#dRevision").value : "";
