@@ -981,7 +981,7 @@ function enlaces(txt,et){ const L=String(txt||"").split(/\n/).filter(s=>/^https:
 function listaInspecciones(){
   const m=new Map();
   (DB.inspecciones||[]).forEach(x=>m.set(x.id,{...x}));
-  DB.registros.forEach(r=>{ if(m.has(r.id)) return; const c=v=>r.respuestas.filter(x=>x.valor===v).length, si=c("SI"), no=c("NO"), na=c("NA");
+  DB.registros.forEach(r=>{ if(m.has(r.id)){ const x=m.get(r.id); if(!x.trabajador && r.datos && r.datos.trabajador) x.trabajador=r.datos.trabajador; return; } const c=v=>r.respuestas.filter(x=>x.valor===v).length, si=c("SI"), no=c("NO"), na=c("NA");
     m.set(r.id,{id:r.id, fecha:r.datos.fecha, verificador:r.datos.verificador, area:r.datos.area, lider:r.datos.lider, trabajador:r.datos.trabajador||"", si, no, na, pct: si+no? si/(si+no) : null}); });
   return [...m.values()].map(x=>({...x, hall: DB.hallazgos.filter(h=>h.registro===x.id).length}));
 }
