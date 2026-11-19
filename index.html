@@ -431,7 +431,7 @@
     <div class="dlg-b">
       <div class="nota" id="dlgPreg"></div>
       <label class="campo">Estado
-        <select id="dEstado"><option value="PENDIENTE">EN GESTIÓN</option><option value="CERRADO">CERRADO</option></select>
+        <select id="dEstado"><option value="PENDIENTE">PENDIENTE</option><option value="GESTION">EN GESTIÓN</option><option value="CERRADO">CERRADO</option></select>
       </label>
       <label class="campo" id="dRevBox">Nueva fecha de revisión para cierre<input type="date" id="dRevision"><span class="nota" style="font-weight:400">El plazo original se mantiene; esta es la fecha en que se revisará el avance.</span></label>
       <div class="grid">
@@ -1309,7 +1309,7 @@ $("#tbHall").addEventListener("click", e=>{
   $("#dlgTit").textContent=(ADMIN?"Actualizar":soloVer?"Detalle":"Cerrar")+" hallazgo "+id;
   $("#dlgPreg").innerHTML=`<div class="nota">Levantado por <b>${esc(h.verificador)||"—"}</b> · ${fmt(h.fecha)} · ${esc(h.area)}${h.lider?" · Supervisor "+esc(h.lider):""}</div><b>${esc(h.pregunta)}</b><br>${esc(h.comentario)}${(h.evid||[]).length?`<div class="evids" style="margin-top:6px">${thumbs(h.evid,{sm:1})}</div>`:""}`;
   hidratar($("#dlgPreg")); DLG_EV=(h.evidCierre||[]).slice(); pintarEvidDlg();
-  $("#dEstado").value=h.estado; $("#dResp").value=h.responsable; $("#dPlazo").value=h.plazo;
+  $("#dEstado").value = h.estado==="CERRADO" ? "CERRADO" : (h.revision ? "GESTION" : "PENDIENTE"); $("#dResp").value=h.responsable; $("#dPlazo").value=h.plazo;
   $("#dCierre").value=h.cierre; $("#dFechaCierre").value=h.fechaCierre; $("#dRevision").value=h.revision||""; $("#dErr").style.display="none"; $("#dErrRev").style.display="none";
   pintarEstadoDlg();
   // Sin clave: la desviación, el responsable y el plazo no se editan; solo se puede cerrar un hallazgo PENDIENTE.
@@ -1320,20 +1320,20 @@ $("#tbHall").addEventListener("click", e=>{
   DLG_SOLO = soloVer; pintarEvidDlg();
   $("#dlg").showModal();
 });
-function pintarEstadoDlg(){ const g=$("#dEstado").value!=="CERRADO"; $("#dRevBox").style.display=g?"":"none"; $("#dFcBox").style.display=g?"none":""; }
+function pintarEstadoDlg(){ const v=$("#dEstado").value, g=v==="GESTION"; $("#dFcBox").style.display=v==="CERRADO"?"":"none"; $("#dRevBox").style.display=g?"":"none"; }
 $("#dEstado").addEventListener("change",()=>{ if($("#dEstado").value==="CERRADO" && !$("#dFechaCierre").value) $("#dFechaCierre").value=hoy(); pintarEstadoDlg(); });
 $("#dGuardar").addEventListener("click", e=>{
   if($("#dEstado").value==="CERRADO" && !$("#dCierre").value.trim()){ e.preventDefault(); $("#dErr").style.display="block"; return; }
-  if($("#dEstado").value!=="CERRADO" && !$("#dRevision").value && !$("#dRevision").disabled && !ADMIN){ e.preventDefault(); $("#dErrRev").style.display="block"; return; }
+  if($("#dEstado").value==="GESTION" && !$("#dRevision").value && !$("#dRevision").disabled && !ADMIN){ e.preventDefault(); $("#dErrRev").style.display="block"; return; }
   const h=DB.hallazgos.find(x=>x.id===editId);
   if(DLG_SOLO){ e.preventDefault(); return; }
-  h.estado=$("#dEstado").value;
+  const vEst=$("#dEstado").value; h.estado = vEst==="CERRADO" ? "CERRADO" : "PENDIENTE";
   if(ADMIN){ h.responsable=$("#dResp").value.trim(); h.plazo=$("#dPlazo").value; }
   h.evidCierre=DLG_EV.slice();
   h.cierre=$("#dCierre").value.trim(); h.fechaCierre = h.estado==="CERRADO" ? ($("#dFechaCierre").value||hoy()) : "";
-  h.revision = h.estado==="CERRADO" ? "" : $("#dRevision").value;
+  h.revision = vEst==="GESTION" ? $("#dRevision").value : "";
   guardar(); (h.evidCierre||[]).forEach(v=>encolar("evidencia",v.id)); encolar("hallazgo",h.id); sincronizar();
-  renderHall(); toast(`Hallazgo ${h.id}: ${h.estado==="CERRADO"?"CERRADO":"EN GESTIÓN"+(h.revision?" · revisión "+fmt(h.revision):"")}`);
+  renderHall(); toast(`Hallazgo ${h.id}: ${h.estado==="CERRADO"?"CERRADO":h.revision?"EN GESTIÓN · revisión "+fmt(h.revision):"PENDIENTE"}`);
 });
 
 /* ---------- registros ---------- */
