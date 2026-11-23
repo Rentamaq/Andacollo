@@ -212,7 +212,7 @@
   .pz-ley em{font-style:normal;color:var(--gris-2);min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
   .pz-tot{font-size:12.5px;color:var(--gris-2);margin-top:6px}
   .cal-t{border-collapse:collapse;font-size:12px;width:100%} .cal-t th,.cal-t td{border:1px solid #E3E3E3;padding:4px 3px;text-align:center;white-space:nowrap} .cal-t th{background:#3F3F3F;color:#fff;font-weight:600} .cal-t td.n{text-align:left;font-weight:700;padding:4px 8px}
-  .cal-t .ok{background:#E6F3E7;color:#2E7D32;font-weight:700} .cal-t .no{background:#FBE9E9;color:#C62828;font-weight:700} .cal-t .hoy{background:#FFF4E5;color:#C76E00;font-weight:700} .cal-t .fut{color:#9E9E9E} .cal-t .extra{color:#1565C0;font-weight:700} .cal-t th.fs{background:#6A6A6A}
+  .cal-t .ok{background:#E6F3E7;color:#2E7D32;font-weight:700} .cal-t .no{background:#FBE9E9;color:#C62828;font-weight:700} .cal-t .hoy{background:#FFF4E5;color:#C76E00;font-weight:700} .cal-t .fut{color:#9E9E9E} .cal-t .extra{color:#1565C0;font-weight:700} .cal-t .comp{background:#E6F3E7;color:#1565C0;font-weight:700} .cal-t th.fs{background:#6A6A6A}
   .cal-est{display:inline-block;border-radius:4px;padding:2px 6px;color:#fff;font-weight:700;font-size:11px} .cal-est.cum{background:#2E7D32} .cal-est.ncum{background:#C62828} .cal-ley{font-size:12px;color:#5E5E5E;margin-top:8px;line-height:1.5}
   .pz-otros{font-size:12.5px;color:#5E5E5E;margin-top:6px;line-height:1.4}
   .otro-det{margin-top:10px;font-size:13px} .otro-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc)} .otro-det h4{margin:10px 0 4px;font-size:13px} .otro-det ul{margin:0;padding-left:18px} .otro-det li{margin:3px 0} .otro-det em{color:#7A7A7A;font-style:normal}
@@ -1390,8 +1390,10 @@ function cumplimientoCalendario(I,fa,fd,fh,HOY){
     const dias=F.map(d=>{ let cod=l.dias[d]||""; if(cod&&fa&&C.areas[cod]!==fa) cod=""; const hechos=mios.filter(x=>x.fecha===d);
       let e=""; if(cod) e=d<HOY?(hechos.length?"ok":"no"):d===HOY?(hechos.length?"ok":"hoy"):"fut"; else if(hechos.length&&d<=HOY) e="extra";
       return {d,cod,e,n:hechos.length,areas:[...new Set(hechos.map(x=>x.area))]}; });
-    const ok=dias.filter(x=>x.e==="ok").length, no=dias.filter(x=>x.e==="no").length, prog=ok+no;
-    return {nombre:l.nombre,dias,ok,no,prog,hoy:dias.some(x=>x.e==="hoy"),extra:dias.filter(x=>x.e==="extra").length,pct:prog?ok/prog:null,cumple:prog?no===0:null,
+    // un levantamiento en un día no programado compensa un día programado sin inspección (el más antiguo primero)
+    const ext=dias.filter(x=>x.e==="extra"); dias.filter(x=>x.e==="no").forEach(x=>{ const c=ext.find(z=>!z.usado); if(c){ c.usado=true; x.e="comp"; x.compPor=c.d; } });
+    const comp=dias.filter(x=>x.e==="comp").length, ok=dias.filter(x=>x.e==="ok").length+comp, no=dias.filter(x=>x.e==="no").length, prog=ok+no;
+    return {nombre:l.nombre,dias,ok,no,comp,prog,hoy:dias.some(x=>x.e==="hoy"),extra:dias.filter(x=>x.e==="extra").length,pct:prog?ok/prog:null,cumple:prog?no===0:null,
       fallas:dias.filter(x=>x.e==="no")}; }).filter(f=>f.dias.some(x=>x.cod)||f.extra);
   const ok=filas.reduce((a,f)=>a+f.ok,0), prog=filas.reduce((a,f)=>a+f.prog,0);
   return {F,filas,ok,prog,pct:prog?ok/prog:null};
@@ -1400,14 +1402,14 @@ function htmlCalendario(K){
   if(!K.filas.length) return '<div class="db-vacio">Sin visitas programadas para estos filtros.</div>';
   const pc=v=>v==null?"—":Math.round(v*100)+"%";
   const cab=K.F.map(d=>{ const w=new Date(d+"T12:00:00").getDay(); return `<th class="${w%6===0?"fs":""}">${DIAS_SEM[w]}<br>${d.slice(8)}</th>`; }).join("");
-  const filas=K.filas.map(f=>`<tr><td class="n">${esc(f.nombre)}</td>${f.dias.map(x=>{ const t=x.e==="ok"?"✓":x.e==="no"?"✗":x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod;
-    const tit=x.cod?`${fmt(x.d)} · programado ${CAL_LIDERES.areas[x.cod]||x.cod}${x.n?` · ${x.n} levantamiento(s) en ${x.areas.join(", ")}`:" · sin levantamiento"}`:(x.n?`${fmt(x.d)} · ${x.n} levantamiento(s) fuera de calendario`:"");
-    return `<td class="${x.e}" title="${esc(tit)}">${x.e==="ok"||x.e==="no"?`${t}<br><small>${esc(x.cod)}</small>`:esc(t)}</td>`; }).join("")}
+  const filas=K.filas.map(f=>`<tr><td class="n">${esc(f.nombre)}</td>${f.dias.map(x=>{ const t=x.e==="ok"?"✓":x.e==="no"?"✗":x.e==="comp"?"↺":x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod;
+    const tit=x.cod?`${fmt(x.d)} · programado ${CAL_LIDERES.areas[x.cod]||x.cod}${x.n?` · ${x.n} levantamiento(s) en ${x.areas.join(", ")}`:x.e==="comp"?` · compensado con el levantamiento del ${fmt(x.compPor)}`:" · sin levantamiento"}`:(x.n?`${fmt(x.d)} · ${x.n} levantamiento(s) fuera de calendario`:"");
+    return `<td class="${x.e}" title="${esc(tit)}">${x.e==="ok"||x.e==="no"||x.e==="comp"?`${t}<br><small>${esc(x.cod)}</small>`:esc(t)}</td>`; }).join("")}
     <td><b>${f.ok}/${f.prog}</b></td><td><b>${pc(f.pct)}</b></td><td>${f.cumple==null?(f.hoy?'<span class="nota">hoy</span>':"—"):`<span class="cal-est ${f.cumple?"cum":"ncum"}">${f.cumple?"CUMPLE":"NO CUMPLE"}</span>`}</td></tr>`).join("");
   return `<div class="tabla-wrap"><table class="cal-t"><thead><tr><th>Líder</th>${cab}<th>Realiz./Prog.</th><th>%</th><th>Estado</th></tr></thead><tbody>${filas}
     <tr><td class="n">Total</td><td colspan="${K.F.length}"></td><td><b>${K.ok}/${K.prog}</b></td><td><b>${pc(K.pct)}</b></td><td></td></tr></tbody></table></div>
-    <div class="cal-ley">✓ hizo levantamiento el día programado · ✗ no hizo levantamiento ese día · <b style="color:#C76E00">hoy</b> programado hoy (aún sin registro) · código gris = programado a futuro · <b style="color:#1565C0">+</b> levantamiento en un día no programado.
-    Cumple = realizó levantamiento en todos sus días programados hasta ayer. Calendario: ${esc(CAL_LIDERES.archivo)} (${fmt(CAL_LIDERES.desde)} al ${fmt(CAL_LIDERES.hasta)}). Áreas: MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.</div>`;
+    <div class="cal-ley">✓ hizo levantamiento el día programado · ✗ no hizo levantamiento ese día · <b style="color:#C76E00">hoy</b> programado hoy (aún sin registro) · código gris = programado a futuro · <b style="color:#1565C0">+</b> levantamiento en un día no programado · <b style="color:#1565C0">↺</b> día programado sin inspección, compensado con un levantamiento en un día no programado.
+    Cumple = todos sus días programados hasta ayer tienen levantamiento (ese día o compensado con otro día). Calendario: ${esc(CAL_LIDERES.archivo)} (${fmt(CAL_LIDERES.desde)} al ${fmt(CAL_LIDERES.hasta)}). Áreas: MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.</div>`;
 }
 
 // "Otro hallazgo · Categoría": agrupa por categoría para explicar a qué se deben
@@ -1700,27 +1702,28 @@ async function informeDashboardJPG(){
       const n=D.GR.length+1; y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${n}. Cumplimiento del calendario de líderes (levantamientos diarios)`,M+14,y+19); y+=38;
       const pc=v=>v==null?"—":Math.round(v*100)+"%", si=K.filas.filter(f=>f.cumple===true), no=K.filas.filter(f=>f.cumple===false);
       const T=[`Se programaron ${K.prog} visitas hasta ayer y se realizaron ${K.ok}: cumplimiento ${pc(K.pct)}.`,
-        si.length?`Cumplen (levantamiento en todos sus días programados): ${si.map(f=>`${f.nombre} ${f.ok}/${f.prog}`).join(" · ")}.`:"Ningún líder cumple el 100% de sus días programados.",
+        si.length?`Cumplen (levantamiento en todos sus días programados, o compensado con otro día): ${si.map(f=>`${f.nombre} ${f.ok}/${f.prog}${f.comp?` (${f.comp} compensado${f.comp>1?"s":""})`:""}`).join(" · ")}.`:"Ningún líder cumple el 100% de sus días programados.",
         ...(no.length?[`No cumplen: ${no.map(f=>`${f.nombre} ${f.ok}/${f.prog} (faltó ${f.fallas.map(x=>x.d.slice(8)+"-"+x.d.slice(5,7)+" "+x.cod).join(", ")})`).join(" · ")}.`]:[]),
         ...(K.filas.some(f=>f.hoy)?[`Programados hoy, aún sin registro: ${K.filas.filter(f=>f.hoy).map(f=>f.nombre).join(", ")}.`]:[]),
-        ...(K.filas.some(f=>f.extra)?[`Levantamientos en días no programados: ${K.filas.filter(f=>f.extra).map(f=>`${f.nombre} (${f.extra})`).join(" · ")}.`]:[])];
+        ...(K.filas.some(f=>f.comp)?[`Días compensados con levantamientos en días no programados: ${K.filas.filter(f=>f.comp).map(f=>`${f.nombre} (${f.dias.filter(x=>x.e==="comp").map(x=>x.d.slice(8)+"-"+x.d.slice(5,7)+" con "+x.compPor.slice(8)+"-"+x.compPor.slice(5,7)).join(", ")})`).join(" · ")}.`]:[]),
+        ...(K.filas.some(f=>f.extra>f.comp)?[`Levantamientos adicionales en días no programados: ${K.filas.filter(f=>f.extra>f.comp).map(f=>`${f.nombre} (${f.extra-f.comp})`).join(" · ")}.`]:[])];
       ctx.font=`14.5px ${F}`; T.forEach(t=>{ ctx.fillStyle="#E88305"; ctx.beginPath(); ctx.arc(M+6,y+10,3.5,0,2*Math.PI); ctx.fill(); ctx.fillStyle="#3F3F3F"; ctx.font=`14.5px ${F}`; wrap(ctx,t,W-2*M-20).forEach(l=>{ ctx.fillText(l,M+18,y+15); y+=20; }); y+=5; });
       y+=6; const nw=150, sw=[70,50,92], cw=(W-2*M-nw-sw.reduce((a,b)=>a+b,0))/K.F.length, rh=30;
       ctx.fillStyle="#3F3F3F"; ctx.fillRect(M,y,W-2*M,34); ctx.fillStyle="#fff"; ctx.font=`bold 12px ${F}`; ctx.textAlign="left"; ctx.fillText("Líder",M+8,y+21); ctx.textAlign="center";
       K.F.forEach((d,i)=>{ const x=M+nw+i*cw, w=new Date(d+"T12:00:00").getDay(); if(w%6===0){ ctx.fillStyle="#6A6A6A"; ctx.fillRect(x,y,cw,34); } ctx.fillStyle="#fff"; ctx.font=`11px ${F}`; ctx.fillText(DIAS_SEM[w],x+cw/2,y+14); ctx.font=`bold 11px ${F}`; ctx.fillText(d.slice(8),x+cw/2,y+28); });
       let sx=M+nw+K.F.length*cw; ["Real./Prog.","%","Estado"].forEach((t,i)=>{ ctx.font=`bold 11.5px ${F}`; ctx.fillText(t,sx+sw[i]/2,y+21); sx+=sw[i]; }); y+=34;
-      const BG={ok:"#E6F3E7",no:"#FBE9E9",hoy:"#FFF4E5"}, FG={ok:"#2E7D32",no:"#C62828",hoy:"#C76E00",fut:"#9E9E9E",extra:"#1565C0"};
+      const BG={ok:"#E6F3E7",comp:"#E6F3E7",no:"#FBE9E9",hoy:"#FFF4E5"}, FG={ok:"#2E7D32",comp:"#1565C0",no:"#C62828",hoy:"#C76E00",fut:"#9E9E9E",extra:"#1565C0"};
       K.filas.forEach(f=>{ ctx.strokeStyle="#E3E3E3"; ctx.lineWidth=1; ctx.strokeRect(M+.5,y+.5,W-2*M-1,rh);
         ctx.textAlign="left"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 12.5px ${F}`; ctx.fillText(f.nombre,M+8,y+19); ctx.textAlign="center";
         f.dias.forEach((x,i)=>{ const cx=M+nw+i*cw; if(BG[x.e]){ ctx.fillStyle=BG[x.e]; ctx.fillRect(cx+1,y+1,cw-2,rh-2); }
-          const t=x.e==="ok"?"✓"+x.cod:x.e==="no"?"✗"+x.cod:x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod; ctx.fillStyle=FG[x.e]||"#9E9E9E"; ctx.font=`${x.e==="fut"||!x.e?"":"bold "}11px ${F}`; ctx.fillText(t,cx+cw/2,y+19); });
+          const t=x.e==="ok"?"✓"+x.cod:x.e==="no"?"✗"+x.cod:x.e==="comp"?"↺"+x.cod:x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod; ctx.fillStyle=FG[x.e]||"#9E9E9E"; ctx.font=`${x.e==="fut"||!x.e?"":"bold "}11px ${F}`; ctx.fillText(t,cx+cw/2,y+19); });
         let sx=M+nw+K.F.length*cw; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText(`${f.ok}/${f.prog}`,sx+sw[0]/2,y+19); sx+=sw[0]; ctx.fillText(pc(f.pct),sx+sw[1]/2,y+19); sx+=sw[1];
         if(f.cumple!=null){ ctx.fillStyle=f.cumple?"#2E7D32":"#C62828"; ctx.fillRect(sx+6,y+6,sw[2]-12,rh-12); ctx.fillStyle="#fff"; ctx.font=`bold 11px ${F}`; ctx.fillText(f.cumple?"CUMPLE":"NO CUMPLE",sx+sw[2]/2,y+19); }
         else { ctx.fillStyle="#7A7A7A"; ctx.font=`11px ${F}`; ctx.fillText(f.hoy?"hoy":"—",sx+sw[2]/2,y+19); }
         y+=rh; });
       ctx.textAlign="left"; ctx.fillStyle="#F4F4F4"; ctx.fillRect(M,y,W-2*M,rh); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText("Total",M+8,y+19); ctx.textAlign="center";
       const tx2=M+nw+K.F.length*cw; ctx.fillText(`${K.ok}/${K.prog}`,tx2+sw[0]/2,y+19); ctx.fillText(pc(K.pct),tx2+sw[0]+sw[1]/2,y+19); ctx.textAlign="left"; y+=rh+8;
-      ctx.fillStyle="#7A7A7A"; ctx.font=`12px ${F}`; wrap(ctx,`✓ levantamiento el día programado · ✗ sin levantamiento ese día · hoy = programado hoy, aún sin registro · código gris = programado a futuro · + = levantamiento en día no programado. Cumple = levantamiento en todos los días programados hasta ayer. Calendario: ${CAL_LIDERES.archivo}. MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.`,W-2*M).forEach(l=>{ ctx.fillText(l,M,y+12); y+=17; }); y+=6;
+      ctx.fillStyle="#7A7A7A"; ctx.font=`12px ${F}`; wrap(ctx,`✓ levantamiento el día programado · ✗ sin levantamiento ese día · hoy = programado hoy, aún sin registro · código gris = programado a futuro · + = levantamiento en día no programado · ↺ = día programado sin inspección, compensado con un levantamiento en día no programado. Cumple = todos los días programados hasta ayer con levantamiento (ese día o compensado). Calendario: ${CAL_LIDERES.archivo}. MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.`,W-2*M).forEach(l=>{ ctx.fillText(l,M,y+12); y+=17; }); y+=6;
     }
     const OT=D.OT||[], OS=D.GR.flatMap(([,tit,,S])=>S.filter(s=>s.det).map(s=>({tit,s})));
     if(OT.length||OS.length){
