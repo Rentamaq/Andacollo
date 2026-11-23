@@ -211,9 +211,12 @@
   .pz-ley b{font-variant-numeric:tabular-nums}
   .pz-ley em{font-style:normal;color:var(--gris-2);min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
   .pz-tot{font-size:12.5px;color:var(--gris-2);margin-top:6px}
+  .cal-t{border-collapse:collapse;font-size:12px;width:100%} .cal-t th,.cal-t td{border:1px solid #E3E3E3;padding:4px 3px;text-align:center;white-space:nowrap} .cal-t th{background:#3F3F3F;color:#fff;font-weight:600} .cal-t td.n{text-align:left;font-weight:700;padding:4px 8px}
+  .cal-t .ok{background:#E6F3E7;color:#2E7D32;font-weight:700} .cal-t .no{background:#FBE9E9;color:#C62828;font-weight:700} .cal-t .hoy{background:#FFF4E5;color:#C76E00;font-weight:700} .cal-t .fut{color:#9E9E9E} .cal-t .extra{color:#1565C0;font-weight:700} .cal-t th.fs{background:#6A6A6A}
+  .cal-est{display:inline-block;border-radius:4px;padding:2px 6px;color:#fff;font-weight:700;font-size:11px} .cal-est.cum{background:#2E7D32} .cal-est.ncum{background:#C62828} .cal-ley{font-size:12px;color:#5E5E5E;margin-top:8px;line-height:1.5}
   .pz-otros{font-size:12.5px;color:#5E5E5E;margin-top:6px;line-height:1.4}
   .otro-det{margin-top:10px;font-size:13px} .otro-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc)} .otro-det h4{margin:10px 0 4px;font-size:13px} .otro-det ul{margin:0;padding-left:18px} .otro-det li{margin:3px 0} .otro-det em{color:#7A7A7A;font-style:normal}
-  .kpi.gest{border-left-color:#1565C0}.kpi.gest b{color:#1565C0}
+  .kpi.gest{border-left-color:#1565C0}.kpi.gest b{color:#1565C0}.kpi.cal{border-left-color:#6A1B9A}.kpi.cal b{color:#6A1B9A}
   @media (max-width:420px){ .db-grid{grid-template-columns:1fr} .pz{justify-content:center} }
   .btn-del{background:#fff;border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px}
   .btn-del:hover{background:var(--rojo-claro)}
@@ -395,6 +398,7 @@
       <div class="card"><h2 class="subtit">Hallazgos por área</h2><div id="pzHallArea"></div></div>
       <div class="card"><h2 class="subtit">Hallazgos por supervisor del área</h2><div id="pzSup"></div></div>
       <div class="card" style="grid-column:1/-1"><h2 class="subtit">Desviaciones más repetidas</h2><div id="pzTop"></div></div>
+      <div class="card" style="grid-column:1/-1"><h2 class="subtit">Cumplimiento del calendario de líderes <span class="nota">(levantamientos diarios según programa)</span></h2><div id="pzCal"></div></div>
     </div>
   </section>
 
@@ -1375,6 +1379,37 @@ function renderReg(){
 }
 /* ---------- dashboard ---------- */
 let ULTDASH=null;
+// Calendario de visitas a terreno de líderes (hoja "Programa" de CALENDARIO_TERRENO_LIDERES_NOV_2026_v2). Actualizar cada mes.
+const CAL_LIDERES={"archivo":"CALENDARIO_TERRENO_LIDERES_NOV_2026_v2","desde":"2026-11-11","hasta":"2026-11-30","areas":{"MI":"Mina","PL":"Planta","IZ":"Izaje","DR":"Depósito de Relaves","PM":"Proyectos","P":"Proyectos"},"lideres":[{"nombre":"Manuel Navarro","dias":{"2026-11-11":"IZ","2026-11-12":"IZ","2026-11-30":"IZ"}},{"nombre":"Daniel Yáñez","dias":{"2026-11-11":"PL","2026-11-12":"PL","2026-11-16":"PL","2026-11-17":"PL","2026-11-18":"PL","2026-11-19":"PL"}},{"nombre":"Rodrigo Valez","dias":{"2026-11-23":"PL","2026-11-24":"PL"}},{"nombre":"Gabriela Bonilla","dias":{"2026-11-11":"DR","2026-11-12":"DR","2026-11-13":"DR","2026-11-16":"DR","2026-11-17":"DR","2026-11-18":"DR","2026-11-19":"MI","2026-11-23":"MI","2026-11-24":"DR","2026-11-25":"MI","2026-11-26":"DR","2026-11-27":"MI","2026-11-30":"DR"}},{"nombre":"René Luna","dias":{"2026-11-11":"PM","2026-11-12":"PM","2026-11-16":"PM","2026-11-17":"PM","2026-11-18":"PM","2026-11-19":"PM","2026-11-23":"PM","2026-11-24":"PM","2026-11-25":"PM","2026-11-26":"PM","2026-11-30":"PM"}},{"nombre":"Nicolas Aviles","dias":{"2026-11-11":"DR","2026-11-18":"IZ","2026-11-25":"PM"}},{"nombre":"Veronica Nuñez","dias":{"2026-11-13":"PL","2026-11-14":"MI","2026-11-15":"IZ","2026-11-25":"PL","2026-11-26":"PL","2026-11-27":"PL","2026-11-28":"PM","2026-11-29":"DR"}},{"nombre":"Christian Gaete","dias":{"2026-11-13":"IZ","2026-11-14":"PL","2026-11-15":"MI","2026-11-16":"IZ","2026-11-24":"IZ","2026-11-25":"IZ","2026-11-26":"IZ","2026-11-27":"DR","2026-11-28":"IZ","2026-11-29":"MI"}},{"nombre":"David Trigo","dias":{"2026-11-17":"IZ","2026-11-19":"IZ","2026-11-20":"PL","2026-11-21":"DR","2026-11-22":"PM","2026-11-23":"IZ"}}]};
+const DIAS_SEM=["D","L","M","X","J","V","S"];
+const claveLider=s=>normNom(s).split(" ").slice(0,2).join(" ");
+function cumplimientoCalendario(I,fa,fd,fh,HOY){
+  const C=CAL_LIDERES, d0=[C.desde,fd].filter(Boolean).sort().pop(), d1=[C.hasta,fh].filter(Boolean).sort()[0], F=[];
+  for(let d=new Date(d0+"T12:00:00"); d.toISOString().slice(0,10)<=d1; d.setDate(d.getDate()+1)) F.push(d.toISOString().slice(0,10));
+  const filas=C.lideres.map(l=>{ const k=claveLider(l.nombre), mios=I.filter(x=>claveLider(x.verificador)===k);
+    const dias=F.map(d=>{ let cod=l.dias[d]||""; if(cod&&fa&&C.areas[cod]!==fa) cod=""; const hechos=mios.filter(x=>x.fecha===d);
+      let e=""; if(cod) e=d<HOY?(hechos.length?"ok":"no"):d===HOY?(hechos.length?"ok":"hoy"):"fut"; else if(hechos.length&&d<=HOY) e="extra";
+      return {d,cod,e,n:hechos.length,areas:[...new Set(hechos.map(x=>x.area))]}; });
+    const ok=dias.filter(x=>x.e==="ok").length, no=dias.filter(x=>x.e==="no").length, prog=ok+no;
+    return {nombre:l.nombre,dias,ok,no,prog,hoy:dias.some(x=>x.e==="hoy"),extra:dias.filter(x=>x.e==="extra").length,pct:prog?ok/prog:null,cumple:prog?no===0:null,
+      fallas:dias.filter(x=>x.e==="no")}; }).filter(f=>f.dias.some(x=>x.cod)||f.extra);
+  const ok=filas.reduce((a,f)=>a+f.ok,0), prog=filas.reduce((a,f)=>a+f.prog,0);
+  return {F,filas,ok,prog,pct:prog?ok/prog:null};
+}
+function htmlCalendario(K){
+  if(!K.filas.length) return '<div class="db-vacio">Sin visitas programadas para estos filtros.</div>';
+  const pc=v=>v==null?"—":Math.round(v*100)+"%";
+  const cab=K.F.map(d=>{ const w=new Date(d+"T12:00:00").getDay(); return `<th class="${w%6===0?"fs":""}">${DIAS_SEM[w]}<br>${d.slice(8)}</th>`; }).join("");
+  const filas=K.filas.map(f=>`<tr><td class="n">${esc(f.nombre)}</td>${f.dias.map(x=>{ const t=x.e==="ok"?"✓":x.e==="no"?"✗":x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod;
+    const tit=x.cod?`${fmt(x.d)} · programado ${CAL_LIDERES.areas[x.cod]||x.cod}${x.n?` · ${x.n} levantamiento(s) en ${x.areas.join(", ")}`:" · sin levantamiento"}`:(x.n?`${fmt(x.d)} · ${x.n} levantamiento(s) fuera de calendario`:"");
+    return `<td class="${x.e}" title="${esc(tit)}">${x.e==="ok"||x.e==="no"?`${t}<br><small>${esc(x.cod)}</small>`:esc(t)}</td>`; }).join("")}
+    <td><b>${f.ok}/${f.prog}</b></td><td><b>${pc(f.pct)}</b></td><td>${f.cumple==null?(f.hoy?'<span class="nota">hoy</span>':"—"):`<span class="cal-est ${f.cumple?"cum":"ncum"}">${f.cumple?"CUMPLE":"NO CUMPLE"}</span>`}</td></tr>`).join("");
+  return `<div class="tabla-wrap"><table class="cal-t"><thead><tr><th>Líder</th>${cab}<th>Realiz./Prog.</th><th>%</th><th>Estado</th></tr></thead><tbody>${filas}
+    <tr><td class="n">Total</td><td colspan="${K.F.length}"></td><td><b>${K.ok}/${K.prog}</b></td><td><b>${pc(K.pct)}</b></td><td></td></tr></tbody></table></div>
+    <div class="cal-ley">✓ hizo levantamiento el día programado · ✗ no hizo levantamiento ese día · <b style="color:#C76E00">hoy</b> programado hoy (aún sin registro) · código gris = programado a futuro · <b style="color:#1565C0">+</b> levantamiento en un día no programado.
+    Cumple = realizó levantamiento en todos sus días programados hasta ayer. Calendario: ${esc(CAL_LIDERES.archivo)} (${fmt(CAL_LIDERES.desde)} al ${fmt(CAL_LIDERES.hasta)}). Áreas: MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.</div>`;
+}
+
 // "Otro hallazgo · Categoría": agrupa por categoría para explicar a qué se deben
 function otrosHallazgos(H){ const m=new Map(); H.filter(h=>/^otro hallazgo/i.test(String(h.pregunta||""))).forEach(h=>{ const c=String(h.pregunta).split("·")[1]?.trim()||"Sin categoría"; if(!m.has(c)) m.set(c,[]); m.get(c).push(h); });
   return [...m.entries()].map(([cat,L])=>({cat,L})).sort((a,b)=>b.L.length-a.L.length); }
@@ -1426,10 +1461,12 @@ function renderDash(){
   const pcts=I.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p));
   const pcum=pcts.length?Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%":"—";
   const E=est(H), cerr=H.filter(h=>h.estado==="CERRADO"), aTiempo=cerr.filter(h=>!h.plazo||!h.fechaCierre||h.fechaCierre<=h.plazo).length;
+  const CK=cumplimientoCalendario(I,fa,fd,fh,HOY);
   const KP=[
     ["insp",I.length,"Inspecciones (levantamientos)"],["",new Set(I.map(x=>normNom(x.lider)).filter(Boolean)).size,"Supervisores evaluados"],
     ["",pcum,"% cumplimiento promedio"],["",H.length,"Hallazgos totales"],["pend",E.p+E.g+E.v,"Pendientes (abiertos)"],["gest",E.gt,"En gestión"],["crit",E.v,"Vencidos"],
-    ["cerr",E.c,"Cerrados"],["cerr",pctCierre(H),"% de cierre"],["",cerr.length?Math.round(aTiempo/cerr.length*100)+"%":"—","Cierres dentro del plazo"]
+    ["cerr",E.c,"Cerrados"],["cerr",pctCierre(H),"% de cierre"],["",cerr.length?Math.round(aTiempo/cerr.length*100)+"%":"—","Cierres dentro del plazo"],
+    ["cal",CK.pct==null?"—":Math.round(CK.pct*100)+"%",`Cumplimiento calendario líderes (${CK.ok}/${CK.prog})`]
   ];
   $("#dbKpis").innerHTML=KP.map(([c,v,l])=>`<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
   // colores fijos por persona (misma persona = mismo color en todos los gráficos)
@@ -1455,9 +1492,10 @@ function renderDash(){
     ["top","Desviaciones más repetidas","#pzTop",segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"]
   ];
   GR.forEach(([,,sel,S,u])=>{ $(sel).innerHTML=torta(S,u); });
+  $("#pzCal").innerHTML=htmlCalendario(CK);
   const OT=otrosHallazgos(H);
   if(OT.length) $("#pzTop").innerHTML+=`<details class="otro-det"><summary>¿A qué se deben los "Otro hallazgo"? (${OT.reduce((a,g)=>a+g.L.length,0)})</summary>${OT.map(g=>`<h4>${esc(g.cat)} (${g.L.length})</h4><ul>${g.L.map(h=>`<li>${esc(h.comentario||"(sin comentario)")} <em>· ${esc(h.area)} · ${esc(estadoTxt(h))}</em></li>`).join("")}</ul>`).join("")}</details>`;
-  ULTDASH={I,H,E,KP,GR,fa,fd,fh,HOY,venc,aTiempo,cerr,OT};
+  ULTDASH={I,H,E,KP,GR,fa,fd,fh,HOY,venc,aTiempo,cerr,OT,CK};
   const u=ls.get(KEY+"_ulth"); $("#dbInfo").textContent = u ? `Datos de todos los equipos · actualizado ${new Date(u).toLocaleString("es-CL")}` : "Datos de este equipo (se actualizan con conexión).";
 }
 /* ---------- exportar dashboard a Excel (.xlsx, sin librerías) ---------- */
@@ -1619,7 +1657,7 @@ async function informeDashboardJPG(){
     ctx.fillText(`Área: ${D.fa||"Todas"} · Desde: ${D.fd?fmt(D.fd):"inicio"} · Hasta: ${D.fh?fmt(D.fh):"hoy"}`,W-M,y+32);
     ctx.textAlign="left"; y+=62; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,W-2*M,5); y+=22;
     // KPI
-    const cols=5, gap=10, kw=(W-2*M-gap*(cols-1))/cols, kh=70, KC={insp:"#3F3F3F",pend:"#E88305",gest:"#1565C0",crit:"#C62828",cerr:"#2E7D32","":"#3F3F3F"};
+    const cols=5, gap=10, kw=(W-2*M-gap*(cols-1))/cols, kh=70, KC={insp:"#3F3F3F",cal:"#6A1B9A",pend:"#E88305",gest:"#1565C0",crit:"#C62828",cerr:"#2E7D32","":"#3F3F3F"};
     D.KP.forEach(([c,v,l],i)=>{ const x=M+(i%cols)*(kw+gap), yy=y+Math.floor(i/cols)*(kh+gap);
       ctx.fillStyle="#fff"; ctx.strokeStyle="#D9D9D9"; ctx.lineWidth=1; ctx.strokeRect(x+.5,yy+.5,kw-1,kh-1); ctx.fillStyle=KC[c]||"#3F3F3F"; ctx.fillRect(x,yy,6,kh);
       ctx.fillStyle=c==="pend"?"#C76E00":(KC[c]||"#3F3F3F"); ctx.font=`bold 28px ${F}`; ctx.fillText(String(v),x+16,yy+34);
@@ -1657,9 +1695,36 @@ async function informeDashboardJPG(){
       y=Math.max(y0+195,ly+6,y0+alto)+10;
       ctx.fillStyle="#E3E3E3"; ctx.fillRect(M,y,W-2*M,1); y+=4;
     });
+    const K=D.CK;
+    if(K&&K.filas.length){
+      const n=D.GR.length+1; y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${n}. Cumplimiento del calendario de líderes (levantamientos diarios)`,M+14,y+19); y+=38;
+      const pc=v=>v==null?"—":Math.round(v*100)+"%", si=K.filas.filter(f=>f.cumple===true), no=K.filas.filter(f=>f.cumple===false);
+      const T=[`Se programaron ${K.prog} visitas hasta ayer y se realizaron ${K.ok}: cumplimiento ${pc(K.pct)}.`,
+        si.length?`Cumplen (levantamiento en todos sus días programados): ${si.map(f=>`${f.nombre} ${f.ok}/${f.prog}`).join(" · ")}.`:"Ningún líder cumple el 100% de sus días programados.",
+        ...(no.length?[`No cumplen: ${no.map(f=>`${f.nombre} ${f.ok}/${f.prog} (faltó ${f.fallas.map(x=>x.d.slice(8)+"-"+x.d.slice(5,7)+" "+x.cod).join(", ")})`).join(" · ")}.`]:[]),
+        ...(K.filas.some(f=>f.hoy)?[`Programados hoy, aún sin registro: ${K.filas.filter(f=>f.hoy).map(f=>f.nombre).join(", ")}.`]:[]),
+        ...(K.filas.some(f=>f.extra)?[`Levantamientos en días no programados: ${K.filas.filter(f=>f.extra).map(f=>`${f.nombre} (${f.extra})`).join(" · ")}.`]:[])];
+      ctx.font=`14.5px ${F}`; T.forEach(t=>{ ctx.fillStyle="#E88305"; ctx.beginPath(); ctx.arc(M+6,y+10,3.5,0,2*Math.PI); ctx.fill(); ctx.fillStyle="#3F3F3F"; ctx.font=`14.5px ${F}`; wrap(ctx,t,W-2*M-20).forEach(l=>{ ctx.fillText(l,M+18,y+15); y+=20; }); y+=5; });
+      y+=6; const nw=150, sw=[70,50,92], cw=(W-2*M-nw-sw.reduce((a,b)=>a+b,0))/K.F.length, rh=30;
+      ctx.fillStyle="#3F3F3F"; ctx.fillRect(M,y,W-2*M,34); ctx.fillStyle="#fff"; ctx.font=`bold 12px ${F}`; ctx.textAlign="left"; ctx.fillText("Líder",M+8,y+21); ctx.textAlign="center";
+      K.F.forEach((d,i)=>{ const x=M+nw+i*cw, w=new Date(d+"T12:00:00").getDay(); if(w%6===0){ ctx.fillStyle="#6A6A6A"; ctx.fillRect(x,y,cw,34); } ctx.fillStyle="#fff"; ctx.font=`11px ${F}`; ctx.fillText(DIAS_SEM[w],x+cw/2,y+14); ctx.font=`bold 11px ${F}`; ctx.fillText(d.slice(8),x+cw/2,y+28); });
+      let sx=M+nw+K.F.length*cw; ["Real./Prog.","%","Estado"].forEach((t,i)=>{ ctx.font=`bold 11.5px ${F}`; ctx.fillText(t,sx+sw[i]/2,y+21); sx+=sw[i]; }); y+=34;
+      const BG={ok:"#E6F3E7",no:"#FBE9E9",hoy:"#FFF4E5"}, FG={ok:"#2E7D32",no:"#C62828",hoy:"#C76E00",fut:"#9E9E9E",extra:"#1565C0"};
+      K.filas.forEach(f=>{ ctx.strokeStyle="#E3E3E3"; ctx.lineWidth=1; ctx.strokeRect(M+.5,y+.5,W-2*M-1,rh);
+        ctx.textAlign="left"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 12.5px ${F}`; ctx.fillText(f.nombre,M+8,y+19); ctx.textAlign="center";
+        f.dias.forEach((x,i)=>{ const cx=M+nw+i*cw; if(BG[x.e]){ ctx.fillStyle=BG[x.e]; ctx.fillRect(cx+1,y+1,cw-2,rh-2); }
+          const t=x.e==="ok"?"✓"+x.cod:x.e==="no"?"✗"+x.cod:x.e==="hoy"?"hoy":x.e==="extra"?"+":x.cod; ctx.fillStyle=FG[x.e]||"#9E9E9E"; ctx.font=`${x.e==="fut"||!x.e?"":"bold "}11px ${F}`; ctx.fillText(t,cx+cw/2,y+19); });
+        let sx=M+nw+K.F.length*cw; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText(`${f.ok}/${f.prog}`,sx+sw[0]/2,y+19); sx+=sw[0]; ctx.fillText(pc(f.pct),sx+sw[1]/2,y+19); sx+=sw[1];
+        if(f.cumple!=null){ ctx.fillStyle=f.cumple?"#2E7D32":"#C62828"; ctx.fillRect(sx+6,y+6,sw[2]-12,rh-12); ctx.fillStyle="#fff"; ctx.font=`bold 11px ${F}`; ctx.fillText(f.cumple?"CUMPLE":"NO CUMPLE",sx+sw[2]/2,y+19); }
+        else { ctx.fillStyle="#7A7A7A"; ctx.font=`11px ${F}`; ctx.fillText(f.hoy?"hoy":"—",sx+sw[2]/2,y+19); }
+        y+=rh; });
+      ctx.textAlign="left"; ctx.fillStyle="#F4F4F4"; ctx.fillRect(M,y,W-2*M,rh); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText("Total",M+8,y+19); ctx.textAlign="center";
+      const tx2=M+nw+K.F.length*cw; ctx.fillText(`${K.ok}/${K.prog}`,tx2+sw[0]/2,y+19); ctx.fillText(pc(K.pct),tx2+sw[0]+sw[1]/2,y+19); ctx.textAlign="left"; y+=rh+8;
+      ctx.fillStyle="#7A7A7A"; ctx.font=`12px ${F}`; wrap(ctx,`✓ levantamiento el día programado · ✗ sin levantamiento ese día · hoy = programado hoy, aún sin registro · código gris = programado a futuro · + = levantamiento en día no programado. Cumple = levantamiento en todos los días programados hasta ayer. Calendario: ${CAL_LIDERES.archivo}. MI Mina · PL Planta · IZ Izaje · DR Depósito de Relaves · PM Proyectos.`,W-2*M).forEach(l=>{ ctx.fillText(l,M,y+12); y+=17; }); y+=6;
+    }
     const OT=D.OT||[], OS=D.GR.flatMap(([,tit,,S])=>S.filter(s=>s.det).map(s=>({tit,s})));
     if(OT.length||OS.length){
-      y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${D.GR.length+1}. Detalle de "Otros" y "Otro hallazgo"`,M+14,y+19); y+=38;
+      y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${D.GR.length+(D.CK&&D.CK.filas.length?2:1)}. Detalle de "Otros" y "Otro hallazgo"`,M+14,y+19); y+=38;
       OS.forEach(({tit,s})=>{ ctx.font=`bold 14.5px ${F}`; ctx.fillStyle="#3F3F3F"; ctx.fillText(`${s.nombre} en "${tit}" incluye:`,M,y+14); y+=22;
         ctx.font=`14px ${F}`; ctx.fillStyle="#3F3F3F"; wrap(ctx,s.det.map(d=>`${d.nombre} (${d.n})`).join(" · "),W-2*M-16).forEach(l=>{ ctx.fillText(l,M+16,y+14); y+=20; }); y+=8; });
       if(OT.length){ ctx.font=`bold 14.5px ${F}`; ctx.fillStyle="#3F3F3F"; ctx.fillText(`A qué se deben los "Otro hallazgo" (desviaciones registradas fuera de la lista de preguntas):`,M,y+14); y+=24;
