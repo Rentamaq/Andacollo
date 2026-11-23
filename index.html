@@ -214,6 +214,10 @@
   .cal-t{border-collapse:collapse;font-size:12px;width:100%} .cal-t th,.cal-t td{border:1px solid #E3E3E3;padding:4px 3px;text-align:center;white-space:nowrap} .cal-t th{background:#3F3F3F;color:#fff;font-weight:600} .cal-t td.n{text-align:left;font-weight:700;padding:4px 8px}
   .cal-t .ok{background:#E6F3E7;color:#2E7D32;font-weight:700} .cal-t .no{background:#FBE9E9;color:#C62828;font-weight:700} .cal-t .hoy{background:#FFF4E5;color:#C76E00;font-weight:700} .cal-t .fut{color:#9E9E9E} .cal-t .extra{color:#1565C0;font-weight:700} .cal-t .comp{background:#E6F3E7;color:#1565C0;font-weight:700} .cal-t th.fs{background:#6A6A6A}
   .cal-est{display:inline-block;border-radius:4px;padding:2px 6px;color:#fff;font-weight:700;font-size:11px} .cal-est.cum{background:#2E7D32} .cal-est.ncum{background:#C62828} .cal-ley{font-size:12px;color:#5E5E5E;margin-top:8px;line-height:1.5}
+  .lvc{display:flex;flex-direction:column;gap:7px;font-size:13px} .lvc-f{display:grid;grid-template-columns:minmax(90px,30%) 1fr auto;gap:8px;align-items:center}
+  .lvc-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .lvc-b{height:16px} .lvc-b .lev{display:block;height:100%;background:#F7D9B4;border-radius:4px;overflow:hidden} .lvc-b i{display:block;height:100%;background:#2E7D32}
+  .lvc-v{white-space:nowrap;min-width:84px;text-align:right} .lvc-v em{font-style:normal;font-weight:700;margin-left:4px} .lvc-v .ok{color:#2E7D32} .lvc-v .med{color:#C76E00} .lvc-v .bajo{color:#C62828}
+  .lvc-ley{font-size:12px;color:#5E5E5E;margin-top:8px;display:flex;gap:14px;flex-wrap:wrap} .lvc-ley i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
   .pz-otros{font-size:12.5px;color:#5E5E5E;margin-top:6px;line-height:1.4}
   .otro-det{margin-top:10px;font-size:13px} .otro-det summary{cursor:pointer;font-weight:700;color:var(--naranjo-osc)} .otro-det h4{margin:10px 0 4px;font-size:13px} .otro-det ul{margin:0;padding-left:18px} .otro-det li{margin:3px 0} .otro-det em{color:#7A7A7A;font-style:normal}
   .kpi.gest{border-left-color:#1565C0}.kpi.gest b{color:#1565C0}.kpi.cal{border-left-color:#6A1B9A}.kpi.cal b{color:#6A1B9A}
@@ -393,7 +397,7 @@
     <div class="db-grid">
       <div class="card"><h2 class="subtit">Estado de los hallazgos</h2><div id="pzEstado"></div></div>
       <div class="card"><h2 class="subtit">Hallazgos por persona <span class="nota">(quien levantó)</span></h2><div id="pzHallPer"></div></div>
-      <div class="card"><h2 class="subtit">Cierres por persona</h2><div id="pzCierrePer"></div></div>
+      <div class="card"><h2 class="subtit">Levantados vs cerrados por líder</h2><div id="pzCierrePer"></div></div>
       <div class="card"><h2 class="subtit">Levantamientos (inspecciones) por área</h2><div id="pzInspArea"></div></div>
       <div class="card"><h2 class="subtit">Hallazgos por área</h2><div id="pzHallArea"></div></div>
       <div class="card"><h2 class="subtit">Hallazgos por supervisor del área</h2><div id="pzSup"></div></div>
@@ -1379,6 +1383,16 @@ function renderReg(){
 }
 /* ---------- dashboard ---------- */
 let ULTDASH=null;
+// comparativa levantados vs cerrados por líder (barras)
+function barrasCierre(S){
+  if(!S.length) return '<div class="db-vacio">Sin datos para estos filtros.</div>';
+  const mx=Math.max(...S.map(s=>s.n)), T=S.reduce((a,s)=>a+s.n,0), C=S.reduce((a,s)=>a+s.c,0);
+  return `<div class="lvc">${S.map(s=>{ const q=Math.round(s.c/s.n*100); return `<div class="lvc-f"><div class="lvc-n">${esc(nomPropio(s.nombre))}</div>
+    <div class="lvc-b"><span class="lev" style="width:${s.n/mx*100}%"><i style="width:${s.c/s.n*100}%"></i></span></div>
+    <div class="lvc-v"><b>${s.c}/${s.n}</b> <em class="${q>=80?"ok":q>=50?"med":"bajo"}">${q}%</em></div></div>`; }).join("")}</div>
+    <div class="lvc-ley"><span><i style="background:#2E7D32"></i>Cerrados</span><span><i style="background:#F7D9B4"></i>Abiertos (levantados sin cerrar)</span></div>
+    <div class="pz-tot">Total: ${C} cerrados de ${T} hallazgos (${T?Math.round(C/T*100):0}%)</div>`;
+}
 // Calendario de visitas a terreno de líderes (hoja "Programa" de CALENDARIO_TERRENO_LIDERES_NOV_2026_v2). Actualizar cada mes.
 const CAL_LIDERES={"archivo":"CALENDARIO_TERRENO_LIDERES_NOV_2026_v2","desde":"2026-11-11","hasta":"2026-11-30","areas":{"MI":"Mina","PL":"Planta","IZ":"Izaje","DR":"Depósito de Relaves","PM":"Proyectos","P":"Proyectos"},"lideres":[{"nombre":"Manuel Navarro","dias":{"2026-11-11":"IZ","2026-11-12":"IZ","2026-11-30":"IZ"}},{"nombre":"Daniel Yáñez","dias":{"2026-11-11":"PL","2026-11-12":"PL","2026-11-16":"PL","2026-11-17":"PL","2026-11-18":"PL","2026-11-19":"PL"}},{"nombre":"Rodrigo Valez","dias":{"2026-11-23":"PL","2026-11-24":"PL"}},{"nombre":"Gabriela Bonilla","dias":{"2026-11-11":"DR","2026-11-12":"DR","2026-11-13":"DR","2026-11-16":"DR","2026-11-17":"DR","2026-11-18":"DR","2026-11-19":"MI","2026-11-23":"MI","2026-11-24":"DR","2026-11-25":"MI","2026-11-26":"DR","2026-11-27":"MI","2026-11-30":"DR"}},{"nombre":"Nicolas Aviles","dias":{"2026-11-11":"DR","2026-11-18":"IZ","2026-11-25":"PM"}},{"nombre":"Veronica Nuñez","dias":{"2026-11-13":"PL","2026-11-14":"MI","2026-11-15":"IZ","2026-11-25":"PL","2026-11-26":"PL","2026-11-27":"PL","2026-11-28":"PM","2026-11-29":"DR"}},{"nombre":"Christian Gaete","dias":{"2026-11-13":"IZ","2026-11-14":"PL","2026-11-15":"MI","2026-11-16":"IZ","2026-11-24":"IZ","2026-11-25":"IZ","2026-11-26":"IZ","2026-11-27":"DR","2026-11-28":"IZ","2026-11-29":"MI"}},{"nombre":"David Trigo","dias":{"2026-11-17":"IZ","2026-11-19":"IZ","2026-11-20":"PL","2026-11-21":"DR","2026-11-22":"PM","2026-11-23":"IZ"}}]};
 const DIAS_SEM=["D","L","M","X","J","V","S"];
@@ -1487,13 +1501,13 @@ function renderDash(){
   const GR=[
     ["estado","Estado de los hallazgos","#pzEstado",[{nombre:"Cerrados",n:E.c,color:"var(--verde)"},{nombre:"En gestión (con fecha de revisión)",n:E.g,color:"#1565C0"},{nombre:"Pendientes en plazo",n:E.p,color:"var(--naranjo)"},{nombre:"Vencidos",n:E.v,color:"var(--rojo)"}],"hallazgos"],
     ["hallPer","Hallazgos por persona (quien levantó)","#pzHallPer",segs(porPer(H),colPer),"hallazgos"],
-    ["cierrePer","Cierres por persona","#pzCierrePer",segs(porPer(H.filter(h=>h.estado==="CERRADO")),colPer),"cierres"],
+    ["cierrePer","Hallazgos levantados vs cerrados por líder","#pzCierrePer",agrupar(H,x=>normNom(x.verificador),x=>x.verificador).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length,c:g.items.filter(h=>h.estado==="CERRADO").length,color:colPer(g.k)})).sort((a,b)=>b.n-a.n||b.c-a.c),"hallazgos"],
     ["inspArea","Levantamientos (inspecciones) por área","#pzInspArea",segs(porArea(I),colArea),"inspecciones"],
     ["hallArea","Hallazgos por área","#pzHallArea",segs(porArea(H),colArea),"hallazgos"],
     ["sup","Hallazgos por supervisor del área","#pzSup",segs(agrupar(H,h=>normNom(h.lider),h=>h.lider).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"],
     ["top","Desviaciones más repetidas","#pzTop",segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"]
   ];
-  GR.forEach(([,,sel,S,u])=>{ $(sel).innerHTML=torta(S,u); });
+  GR.forEach(([id,,sel,S,u])=>{ $(sel).innerHTML=id==="cierrePer"?barrasCierre(S):torta(S,u); });
   $("#pzCal").innerHTML=htmlCalendario(CK);
   const OT=otrosHallazgos(H);
   if(OT.length) $("#pzTop").innerHTML+=`<details class="otro-det"><summary>¿A qué se deben los "Otro hallazgo"? (${OT.reduce((a,g)=>a+g.L.length,0)})</summary>${OT.map(g=>`<h4>${esc(g.cat)} (${g.L.length})</h4><ul>${g.L.map(h=>`<li>${esc(h.comentario||"(sin comentario)")} <em>· ${esc(h.area)} · ${esc(estadoTxt(h))}</em></li>`).join("")}</ul>`).join("")}</details>`;
@@ -1597,7 +1611,7 @@ function textosGrafico(id, D){
   if(id==="cierrePer"){
     const G=grp(H,h=>normNom(h.verificador),h=>h.verificador).map(g=>({...g,c:g.L.filter(cerr).length})), C=G.reduce((s,g)=>s+g.c,0);
     if(!C){ out.push("Aún no hay hallazgos cerrados con estos filtros."); return out; }
-    const Gc=G.filter(g=>g.c).sort((a,b)=>b.c-a.c); out.push(`${C} cierres en total. ${Gc[0].nombre} lidera con ${Gc[0].c} (${pc(Gc[0].c,C)} de los cierres).`);
+    const Gc=G.filter(g=>g.c).sort((a,b)=>b.c-a.c); out.push(`Se han cerrado ${C} de los ${T} hallazgos levantados (${pc(C,T)}). ${Gc[0].nombre} es quien más ha cerrado: ${Gc[0].c} de ${Gc[0].n}.`);
     out.push(`% de cierre de los hallazgos que levantó cada persona: ${lista(G.slice().sort((a,b)=>b.c/b.n-a.c/a.n||b.n-a.n),g=>`${g.nombre} ${pc(g.c,g.n)}`,6)}.`);
     const sin=G.filter(g=>!g.c); if(sin.length) out.push(`Sin cierres todavía: ${sin.map(g=>`${g.nombre} (${g.n} abierto${g.n>1?"s":""})`).join(", ")}.`);
     out.push("Lectura: compara el cierre con lo levantado por cada persona; un % bajo indica hallazgos que necesitan seguimiento.");
@@ -1674,15 +1688,22 @@ async function informeDashboardJPG(){
       y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${gi+1}. ${tit}`,M+14,y+19); y+=36;
       const y0=y, Sf=S.filter(s=>s.n>0), tot=Sf.reduce((a,s)=>a+s.n,0);
       ctx.strokeStyle="#D9D9D9"; 
+      let ly=y0+8; const lx=M+200, lw=300;
+      if(id==="cierrePer"){ const mx=Math.max(1,...S.map(s=>s.n)), bx=M+150, bw=lx+lw-bx-90; ly=y0+2;
+        S.forEach(s=>{ ctx.textAlign="left"; ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`; let nm=nomPropio(s.nombre); while(ctx.measureText(nm).width>140&&nm.length>4) nm=nm.slice(0,-1); ctx.fillText(nm,M,ly+13);
+          const w=s.n/mx*bw; ctx.fillStyle="#F7D9B4"; ctx.fillRect(bx,ly+2,w,14); ctx.fillStyle="#2E7D32"; ctx.fillRect(bx,ly+2,w*s.c/s.n,14);
+          const q=Math.round(s.c/s.n*100); ctx.textAlign="right"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText(`${s.c}/${s.n}`,lx+lw-42,ly+14); ctx.fillStyle=q>=80?"#2E7D32":q>=50?"#C76E00":"#C62828"; ctx.fillText(q+"%",lx+lw,ly+14); ly+=22; });
+        ctx.textAlign="left"; ctx.font=`12px ${F}`; ctx.fillStyle="#2E7D32"; ctx.fillRect(M,ly+6,11,11); ctx.fillStyle="#5E5E5E"; ctx.fillText("Cerrados",M+16,ly+16); ctx.fillStyle="#F7D9B4"; ctx.fillRect(M+90,ly+6,11,11); ctx.fillStyle="#5E5E5E"; ctx.fillText("Abiertos (levantados sin cerrar)",M+106,ly+16); ly+=24;
+      }
       // torta
       const cx=M+95, cy=y0+95, R=85;
-      if(tot){ let a=-Math.PI/2; Sf.forEach(s=>{ const b=a+s.n/tot*2*Math.PI; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a,b); ctx.closePath(); ctx.fillStyle=col(s.color); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); a=b; });
+      if(id==="cierrePer"){}
+      else if(tot){ let a=-Math.PI/2; Sf.forEach(s=>{ const b=a+s.n/tot*2*Math.PI; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a,b); ctx.closePath(); ctx.fillStyle=col(s.color); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); a=b; });
         ctx.beginPath(); ctx.arc(cx,cy,42,0,2*Math.PI); ctx.fillStyle="#fff"; ctx.fill();
         ctx.textAlign="center"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 22px ${F}`; ctx.fillText(String(tot),cx,cy+6); ctx.font=`11px ${F}`; ctx.fillStyle="#5E5E5E"; ctx.fillText(unidad,cx,cy+21); ctx.textAlign="left"; }
       else { ctx.fillStyle="#7A7A7A"; ctx.font=`14px ${F}`; ctx.fillText("Sin datos",cx-30,cy); }
       // leyenda
-      let ly=y0+8; const lx=M+200, lw=300;
-      Sf.forEach(s=>{ ctx.fillStyle=col(s.color); ctx.fillRect(lx,ly+2,12,12); ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`;
+      if(id!=="cierrePer") Sf.forEach(s=>{ ctx.fillStyle=col(s.color); ctx.fillRect(lx,ly+2,12,12); ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`;
         let nm=["hallPer","cierrePer","sup"].includes(id)?nomPropio(s.nombre):s.nombre; const nm0=nm; while(ctx.measureText(nm).width>lw-90&&nm.length>4) nm=nm.slice(0,-2); if(nm!==nm0) nm=nm.trim()+"…";
         ctx.fillText(nm,lx+18,ly+13); ctx.textAlign="right"; ctx.font=`bold 13px ${F}`; ctx.fillText(String(s.n),lx+lw-42,ly+13); ctx.font=`12px ${F}`; ctx.fillStyle="#7A7A7A"; ctx.fillText(Math.round(s.n/tot*100)+"%",lx+lw,ly+13); ctx.textAlign="left"; ly+=21; });
       // explicación
@@ -1694,7 +1715,7 @@ async function informeDashboardJPG(){
       ctx.fillStyle="#FAFAFA"; ctx.fillRect(ex-12,y0-4,ew+12,alto); ctx.fillStyle="#E88305"; ctx.fillRect(ex-12,y0-4,3,alto);
       bloques.forEach(b=>{ ctx.fillStyle=b.lec?"#1565C0":"#E88305"; ctx.beginPath(); ctx.arc(ex+4,ey+14,3.5,0,2*Math.PI); ctx.fill();
         ctx.fillStyle=b.lec?"#1565C0":"#3F3F3F"; ctx.font=(b.lec?"italic ":"")+`14.5px ${F}`; b.L.forEach(l=>{ ctx.fillText(l,ex+16,ey+19); ey+=20; }); ey+=8; });
-      y=Math.max(y0+195,ly+6,y0+alto)+10;
+      y=Math.max(id==="cierrePer"?0:y0+195,ly+6,y0+alto)+10;
       ctx.fillStyle="#E3E3E3"; ctx.fillRect(M,y,W-2*M,1); y+=4;
     });
     const K=D.CK;
