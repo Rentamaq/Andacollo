@@ -1383,7 +1383,12 @@ function renderReg(){
 }
 /* ---------- dashboard ---------- */
 let ULTDASH=null;
-// comparativa levantados vs cerrados por líder (barras)
+// comparativa levantados vs cerrados por líder: torta 3D de cierres, leyenda con cerrados/levantados y % de cierre de cada líder
+function datosTortaCierre(S){ const T=S.reduce((a,s)=>a+s.n,0), C=S.reduce((a,s)=>a+s.c,0);
+  const L=S.filter(s=>s.c>0).map(s=>({nombre:nomPropio(s.nombre),n:s.c,color:s.color,txt:`${s.c}/${s.n}`,pq:Math.round(s.c/s.n*100)+"%"}));
+  const sin=S.filter(s=>!s.c); L.pie=`Total: ${C} cerrados de ${T} hallazgos (${T?Math.round(C/T*100):0}%)${sin.length?` · Sin cierres: ${sin.map(s=>`${nomPropio(s.nombre)} 0/${s.n}`).join(", ")}`:""}`; return L; }
+function tortaCierre(S){ return torta(datosTortaCierre(S),"cierres")+'<div class="pz-otros">En la leyenda: cerrados / levantados por cada líder y su % de cierre.</div>'; }
+// (anterior) comparativa en barras
 function barrasCierre(S){
   if(!S.length) return '<div class="db-vacio">Sin datos para estos filtros.</div>';
   const mx=Math.max(...S.map(s=>s.n)), T=S.reduce((a,s)=>a+s.n,0), C=S.reduce((a,s)=>a+s.c,0);
@@ -1446,7 +1451,7 @@ let PZN=0;
 const oscurecer=(c,f)=>{ const m=/^#?([0-9a-f]{6})$/i.exec(c); if(!m) return c; const n=parseInt(m[1],16);
   return "#"+[16,8,0].map(s=>Math.round(((n>>s)&255)*f).toString(16).padStart(2,"0")).join(""); };
 function torta(S, unidad){
-  S=S.filter(s=>s.n>0); const tot=S.reduce((a,s)=>a+s.n,0);
+  const pie=S.pie; S=S.filter(s=>s.n>0); const tot=S.reduce((a,s)=>a+s.n,0);
   if(!tot) return '<div class="db-vacio">Sin datos para estos filtros.</div>';
   const RX=88, RY=50, D=22, CX=95, CY=56, g="pzg"+(++PZN);
   const P=(a,dy=0)=>`${(CX+RX*Math.cos(a)).toFixed(2)},${(CY+RY*Math.sin(a)+dy).toFixed(2)}`;
@@ -1462,8 +1467,8 @@ function torta(S, unidad){
     <ellipse class="sombra" cx="${CX}" cy="${CY+D+6}" rx="${RX}" ry="${RY*.5}" fill="#000" opacity=".08"/>${lados}${tapas}
     <ellipse class="brillo" cx="${CX}" cy="${CY}" rx="${RX}" ry="${RY}" fill="url(#${g})" pointer-events="none"/>`;
   return `<div class="pz"><svg viewBox="0 0 190 ${CY+RY+D+16}" role="img" aria-label="Gráfico de torta 3D">${svg}</svg>
-    <ul class="pz-ley">${S.map(s=>`<li><i style="background:${s.color}"></i><span title="${esc(s.nombre)}">${esc(s.nombre)}</span><b>${s.n}</b><em>${pc(s.n)}</em></li>`).join("")}</ul></div>
-    <div class="pz-tot">Total: ${tot} ${unidad}</div>${S.filter(s=>s.det).map(s=>`<div class="pz-otros"><b>${esc(s.nombre)} incluye:</b> ${s.det.map(d=>`${esc(d.nombre)} (${d.n})`).join(" · ")}</div>`).join("")}`;
+    <ul class="pz-ley">${S.map(s=>`<li><i style="background:${s.color}"></i><span title="${esc(s.nombre)}">${esc(s.nombre)}</span><b>${s.txt??s.n}</b><em>${s.pq??pc(s.n)}</em></li>`).join("")}</ul></div>
+    <div class="pz-tot">${pie??`Total: ${tot} ${unidad}`}</div>${S.filter(s=>s.det).map(s=>`<div class="pz-otros"><b>${esc(s.nombre)} incluye:</b> ${s.det.map(d=>`${esc(d.nombre)} (${d.n})`).join(" · ")}</div>`).join("")}`;
 }
 function renderDash(){
   if(!$("#dbKpis")) return;
@@ -1501,13 +1506,13 @@ function renderDash(){
   const GR=[
     ["estado","Estado de los hallazgos","#pzEstado",[{nombre:"Cerrados",n:E.c,color:"var(--verde)"},{nombre:"En gestión (con fecha de revisión)",n:E.g,color:"#1565C0"},{nombre:"Pendientes en plazo",n:E.p,color:"var(--naranjo)"},{nombre:"Vencidos",n:E.v,color:"var(--rojo)"}],"hallazgos"],
     ["hallPer","Hallazgos por persona (quien levantó)","#pzHallPer",segs(porPer(H),colPer),"hallazgos"],
-    ["cierrePer","Hallazgos levantados vs cerrados por líder","#pzCierrePer",agrupar(H,x=>normNom(x.verificador),x=>x.verificador).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length,c:g.items.filter(h=>h.estado==="CERRADO").length,color:colPer(g.k)})).sort((a,b)=>b.n-a.n||b.c-a.c),"hallazgos"],
+    ["cierrePer","Hallazgos levantados vs cerrados por líder","#pzCierrePer",agrupar(H,x=>normNom(x.verificador),x=>x.verificador).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length,c:g.items.filter(h=>h.estado==="CERRADO").length,color:colPer(g.k)})).sort((a,b)=>b.n-a.n||b.c-a.c),"cierres"],
     ["inspArea","Levantamientos (inspecciones) por área","#pzInspArea",segs(porArea(I),colArea),"inspecciones"],
     ["hallArea","Hallazgos por área","#pzHallArea",segs(porArea(H),colArea),"hallazgos"],
     ["sup","Hallazgos por supervisor del área","#pzSup",segs(agrupar(H,h=>normNom(h.lider),h=>h.lider).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"],
     ["top","Desviaciones más repetidas","#pzTop",segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"]
   ];
-  GR.forEach(([id,,sel,S,u])=>{ $(sel).innerHTML=id==="cierrePer"?barrasCierre(S):torta(S,u); });
+  GR.forEach(([id,,sel,S,u])=>{ $(sel).innerHTML=id==="cierrePer"?tortaCierre(S):torta(S,u); });
   $("#pzCal").innerHTML=htmlCalendario(CK);
   const OT=otrosHallazgos(H);
   if(OT.length) $("#pzTop").innerHTML+=`<details class="otro-det"><summary>¿A qué se deben los "Otro hallazgo"? (${OT.reduce((a,g)=>a+g.L.length,0)})</summary>${OT.map(g=>`<h4>${esc(g.cat)} (${g.L.length})</h4><ul>${g.L.map(h=>`<li>${esc(h.comentario||"(sin comentario)")} <em>· ${esc(h.area)} · ${esc(estadoTxt(h))}</em></li>`).join("")}</ul>`).join("")}</details>`;
@@ -1686,10 +1691,11 @@ async function informeDashboardJPG(){
     // gráficos
     D.GR.forEach(([id,tit,,S,unidad],gi)=>{
       y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${gi+1}. ${tit}`,M+14,y+19); y+=36;
+      if(id==="cierrePer") S=datosTortaCierre(S);
       const y0=y, Sf=S.filter(s=>s.n>0), tot=Sf.reduce((a,s)=>a+s.n,0);
       ctx.strokeStyle="#D9D9D9"; 
       let ly=y0+8; const lx=M+200, lw=300;
-      if(id==="cierrePer"){ const mx=Math.max(1,...S.map(s=>s.n)), bx=M+150, bw=lx+lw-bx-90; ly=y0+2;
+      if(false){ const mx=Math.max(1,...S.map(s=>s.n)), bx=M+150, bw=lx+lw-bx-90; ly=y0+2;
         S.forEach(s=>{ ctx.textAlign="left"; ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`; let nm=nomPropio(s.nombre); while(ctx.measureText(nm).width>140&&nm.length>4) nm=nm.slice(0,-1); ctx.fillText(nm,M,ly+13);
           const w=s.n/mx*bw; ctx.fillStyle="#F7D9B4"; ctx.fillRect(bx,ly+2,w,14); ctx.fillStyle="#2E7D32"; ctx.fillRect(bx,ly+2,w*s.c/s.n,14);
           const q=Math.round(s.c/s.n*100); ctx.textAlign="right"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 13px ${F}`; ctx.fillText(`${s.c}/${s.n}`,lx+lw-42,ly+14); ctx.fillStyle=q>=80?"#2E7D32":q>=50?"#C76E00":"#C62828"; ctx.fillText(q+"%",lx+lw,ly+14); ly+=22; });
@@ -1697,15 +1703,14 @@ async function informeDashboardJPG(){
       }
       // torta
       const cx=M+95, cy=y0+95, R=85;
-      if(id==="cierrePer"){}
-      else if(tot){ let a=-Math.PI/2; Sf.forEach(s=>{ const b=a+s.n/tot*2*Math.PI; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a,b); ctx.closePath(); ctx.fillStyle=col(s.color); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); a=b; });
+      if(tot){ let a=-Math.PI/2; Sf.forEach(s=>{ const b=a+s.n/tot*2*Math.PI; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a,b); ctx.closePath(); ctx.fillStyle=col(s.color); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); a=b; });
         ctx.beginPath(); ctx.arc(cx,cy,42,0,2*Math.PI); ctx.fillStyle="#fff"; ctx.fill();
         ctx.textAlign="center"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 22px ${F}`; ctx.fillText(String(tot),cx,cy+6); ctx.font=`11px ${F}`; ctx.fillStyle="#5E5E5E"; ctx.fillText(unidad,cx,cy+21); ctx.textAlign="left"; }
       else { ctx.fillStyle="#7A7A7A"; ctx.font=`14px ${F}`; ctx.fillText("Sin datos",cx-30,cy); }
       // leyenda
-      if(id!=="cierrePer") Sf.forEach(s=>{ ctx.fillStyle=col(s.color); ctx.fillRect(lx,ly+2,12,12); ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`;
+      Sf.forEach(s=>{ ctx.fillStyle=col(s.color); ctx.fillRect(lx,ly+2,12,12); ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`;
         let nm=["hallPer","cierrePer","sup"].includes(id)?nomPropio(s.nombre):s.nombre; const nm0=nm; while(ctx.measureText(nm).width>lw-90&&nm.length>4) nm=nm.slice(0,-2); if(nm!==nm0) nm=nm.trim()+"…";
-        ctx.fillText(nm,lx+18,ly+13); ctx.textAlign="right"; ctx.font=`bold 13px ${F}`; ctx.fillText(String(s.n),lx+lw-42,ly+13); ctx.font=`12px ${F}`; ctx.fillStyle="#7A7A7A"; ctx.fillText(Math.round(s.n/tot*100)+"%",lx+lw,ly+13); ctx.textAlign="left"; ly+=21; });
+        ctx.fillText(nm,lx+18,ly+13); ctx.textAlign="right"; ctx.font=`bold 13px ${F}`; ctx.fillText(String(s.txt??s.n),lx+lw-42,ly+13); ctx.font=`12px ${F}`; ctx.fillStyle="#7A7A7A"; ctx.fillText(s.pq??(Math.round(s.n/tot*100)+"%"),lx+lw,ly+13); ctx.textAlign="left"; ly+=21; });
       // explicación
       const ex=lx+lw+30, ew=W-M-ex; let ey=y0+4;
       ctx.fillStyle="#FDF1E2"; 
@@ -1715,7 +1720,8 @@ async function informeDashboardJPG(){
       ctx.fillStyle="#FAFAFA"; ctx.fillRect(ex-12,y0-4,ew+12,alto); ctx.fillStyle="#E88305"; ctx.fillRect(ex-12,y0-4,3,alto);
       bloques.forEach(b=>{ ctx.fillStyle=b.lec?"#1565C0":"#E88305"; ctx.beginPath(); ctx.arc(ex+4,ey+14,3.5,0,2*Math.PI); ctx.fill();
         ctx.fillStyle=b.lec?"#1565C0":"#3F3F3F"; ctx.font=(b.lec?"italic ":"")+`14.5px ${F}`; b.L.forEach(l=>{ ctx.fillText(l,ex+16,ey+19); ey+=20; }); ey+=8; });
-      y=Math.max(id==="cierrePer"?0:y0+195,ly+6,y0+alto)+10;
+      if(id==="cierrePer"&&S.pie){ ctx.font=`12px ${F}`; ctx.fillStyle="#5E5E5E"; ly+=4; wrap(ctx,S.pie+" · Leyenda: cerrados/levantados y % de cierre.",lw+200).forEach(l=>{ ctx.fillText(l,M,Math.max(ly,y0+192)+12); ly+=17; }); ly=Math.max(ly,y0+192+17); }
+      y=Math.max(y0+195,ly+6,y0+alto)+10;
       ctx.fillStyle="#E3E3E3"; ctx.fillRect(M,y,W-2*M,1); y+=4;
     });
     const K=D.CK;
