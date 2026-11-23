@@ -379,6 +379,7 @@
         <label class="campo">Hasta<input type="date" id="dbHasta"></label>
         <button class="btn sec" id="dbActualizar" type="button">↻ Actualizar datos</button>
         <button class="btn" id="dbExcel" type="button">⬇ Descargar Excel</button>
+        <button class="btn" id="dbInforme" type="button">🖼 Informe explicativo (JPG)</button>
       </div>
       <div class="actualiz" id="dbInfo"></div>
     </div>
@@ -1370,6 +1371,7 @@ function renderReg(){
   }).join("") : `<tr><td colspan="9" class="vacio">Aún no hay formularios enviados.</td></tr>`;
 }
 /* ---------- dashboard ---------- */
+let ULTDASH=null;
 const normNom = s => String(s||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ");
 function agrupar(lista, clave, nombre){
   const m=new Map();
@@ -1417,11 +1419,12 @@ function renderDash(){
   const pcts=I.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p));
   const pcum=pcts.length?Math.round(pcts.reduce((a,b)=>a+ +b,0)/pcts.length*100)+"%":"—";
   const E=est(H), cerr=H.filter(h=>h.estado==="CERRADO"), aTiempo=cerr.filter(h=>!h.plazo||!h.fechaCierre||h.fechaCierre<=h.plazo).length;
-  $("#dbKpis").innerHTML=[
+  const KP=[
     ["insp",I.length,"Inspecciones (levantamientos)"],["",new Set(I.map(x=>normNom(x.lider)).filter(Boolean)).size,"Supervisores evaluados"],
     ["",pcum,"% cumplimiento promedio"],["",H.length,"Hallazgos totales"],["pend",E.p+E.v,"Pendientes"],["crit",E.v,"Vencidos"],
     ["cerr",E.c,"Cerrados"],["cerr",pctCierre(H),"% de cierre"],["",cerr.length?Math.round(aTiempo/cerr.length*100)+"%":"—","Cierres dentro del plazo"]
-  ].map(([c,v,l])=>`<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
+  ];
+  $("#dbKpis").innerHTML=KP.map(([c,v,l])=>`<div class="kpi ${c}"><b>${v}</b><span>${l}</span></div>`).join("");
   // colores fijos por persona (misma persona = mismo color en todos los gráficos)
   const CAT=["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#6250d6","#e34948"], OTRO="#9E9E9E";
   const pesoPer=new Map(); I.forEach(x=>{const k=normNom(x.verificador); pesoPer.set(k,(pesoPer.get(k)||0)+1);}); H.forEach(h=>{const k=normNom(h.verificador); pesoPer.set(k,(pesoPer.get(k)||0)+2);});
@@ -1434,14 +1437,18 @@ function renderDash(){
     if(L.length<=max+1) return L.map((g,i)=>({...g,color:col(g,i)}));
     const resto=L.slice(max).reduce((s,g)=>s+g.n,0); return L.slice(0,max).map((g,i)=>({...g,color:col(g,i)})).concat([{nombre:`Otros (${L.length-max})`,n:resto,color:OTRO}]); };
   const porPer=L=>agrupar(L,x=>normNom(x.verificador),x=>x.verificador).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length}));
-  $("#pzEstado").innerHTML=torta([{nombre:"Cerrados",n:E.c,color:"var(--verde)"},{nombre:"Pendientes en plazo",n:E.p,color:"var(--naranjo)"},{nombre:"Vencidos",n:E.v,color:"var(--rojo)"}],"hallazgos");
-  $("#pzHallPer").innerHTML=torta(segs(porPer(H),colPer),"hallazgos");
-  $("#pzCierrePer").innerHTML=torta(segs(porPer(H.filter(h=>h.estado==="CERRADO")),colPer),"cierres");
   const porArea=L=>agrupar(L,x=>x.area,x=>x.area).map(g=>({k:g.nombre,nombre:g.nombre,n:g.items.length}));
-  $("#pzInspArea").innerHTML=torta(segs(porArea(I),colArea),"inspecciones");
-  $("#pzHallArea").innerHTML=torta(segs(porArea(H),colArea),"hallazgos");
-  $("#pzSup").innerHTML=torta(segs(agrupar(H,h=>normNom(h.lider),h=>h.lider).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos");
-  $("#pzTop").innerHTML=torta(segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos");
+  const GR=[
+    ["estado","Estado de los hallazgos","#pzEstado",[{nombre:"Cerrados",n:E.c,color:"var(--verde)"},{nombre:"Pendientes en plazo",n:E.p,color:"var(--naranjo)"},{nombre:"Vencidos",n:E.v,color:"var(--rojo)"}],"hallazgos"],
+    ["hallPer","Hallazgos por persona (quien levantó)","#pzHallPer",segs(porPer(H),colPer),"hallazgos"],
+    ["cierrePer","Cierres por persona","#pzCierrePer",segs(porPer(H.filter(h=>h.estado==="CERRADO")),colPer),"cierres"],
+    ["inspArea","Levantamientos (inspecciones) por área","#pzInspArea",segs(porArea(I),colArea),"inspecciones"],
+    ["hallArea","Hallazgos por área","#pzHallArea",segs(porArea(H),colArea),"hallazgos"],
+    ["sup","Hallazgos por supervisor del área","#pzSup",segs(agrupar(H,h=>normNom(h.lider),h=>h.lider).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"],
+    ["top","Desviaciones más repetidas","#pzTop",segs(agrupar(H,h=>normNom(h.pregunta),h=>h.pregunta).map(g=>({k:g.k,nombre:g.nombre,n:g.items.length})),null),"hallazgos"]
+  ];
+  GR.forEach(([,,sel,S,u])=>{ $(sel).innerHTML=torta(S,u); });
+  ULTDASH={I,H,E,KP,GR,fa,fd,fh,HOY,venc,aTiempo,cerr};
   const u=ls.get(KEY+"_ulth"); $("#dbInfo").textContent = u ? `Datos de todos los equipos · actualizado ${new Date(u).toLocaleString("es-CL")}` : "Datos de este equipo (se actualizan con conexión).";
 }
 /* ---------- exportar dashboard a Excel (.xlsx, sin librerías) ---------- */
@@ -1510,6 +1517,152 @@ function excelDashboard(){
   a.href=URL.createObjectURL(blob); a.download=`Dashboard_Liderazgo_Visible_${hoy()}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
+/* ---------- informe explicativo del dashboard (JPG, dibujado en canvas, sin librerías) ---------- */
+const nomPropio=s=>String(s||"").trim().toLowerCase().replace(/(^|[\s-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+function textosGrafico(id, D){
+  const {I,H,E,venc}=D, T=H.length, pc=(a,b)=>b?Math.round(a/b*100)+"%":"—", cerr=h=>h.estado==="CERRADO";
+  const PER=["hallPer","cierrePer","sup","estado"].includes(id);
+  const grp=(L,kf,nf)=>agrupar(L,kf,nf).map(g=>({nombre:PER?nomPropio(g.nombre):g.nombre,L:g.items,n:g.items.length})).sort((a,b)=>b.n-a.n);
+  const lista=(G,f,max=4)=>G.slice(0,max).map(f).join(" · ")+(G.length>max?` · y ${G.length-max} más`:"");
+  if(!T && id!=="inspArea") return ["Sin hallazgos para los filtros elegidos."];
+  const out=[];
+  if(id==="estado"){
+    const pcN=T?E.c/T:0;
+    out.push(`De los ${T} hallazgos, ${E.c} están cerrados (${pc(E.c,T)}), ${E.p} siguen pendientes dentro de plazo (${pc(E.p,T)}) y ${E.v} están vencidos (${pc(E.v,T)}).`);
+    const gest=H.filter(h=>!cerr(h)&&h.revision).length; if(gest) out.push(`${gest} de los pendientes están EN GESTIÓN, con una nueva fecha de revisión.`);
+    if(E.v){ const R=grp(H.filter(venc),h=>normNom(h.responsable),h=>h.responsable); out.push(`Vencidos por responsable: ${lista(R,g=>`${g.nombre} (${g.n})`)}.`); }
+    else out.push("No hay hallazgos vencidos: todos los pendientes están dentro de su plazo.");
+    const C=H.filter(cerr); if(C.length) out.push(`${D.aTiempo} de los ${C.length} cierres (${pc(D.aTiempo,C.length)}) se hicieron dentro del plazo comprometido.`);
+    out.push(pcN>=.8?"Lectura: nivel de cierre alto; el foco es mantener al día los pendientes y evitar vencimientos."
+      : pcN>=.5?"Lectura: nivel de cierre intermedio; conviene seguir con los responsables los pendientes más antiguos."
+      : "Lectura: nivel de cierre bajo; la mayoría de los hallazgos sigue abierto y requiere seguimiento con los responsables.");
+  }
+  if(id==="hallPer"){
+    const G=grp(H,h=>normNom(h.verificador),h=>h.verificador), top3=G.slice(0,3).reduce((s,g)=>s+g.n,0);
+    out.push(`${T} hallazgos levantados por ${G.length} persona${G.length===1?"":"s"}, un promedio de ${(T/G.length).toFixed(1)} por persona.`);
+    out.push(`${G[0].nombre} levantó más hallazgos: ${G[0].n} (${pc(G[0].n,T)} del total).`);
+    if(G.length>3) out.push(`Las 3 primeras personas concentran ${pc(top3,T)} de los hallazgos.`);
+    const bajos=G.filter(g=>g.n<=1); if(bajos.length) out.push(`Con 1 hallazgo: ${bajos.map(g=>g.nombre).join(", ")}.`);
+    out.push("Lectura: muestra quién está levantando desviaciones en terreno; pocos hallazgos puede indicar baja presencia en terreno o un área con mejor estándar.");
+  }
+  if(id==="cierrePer"){
+    const G=grp(H,h=>normNom(h.verificador),h=>h.verificador).map(g=>({...g,c:g.L.filter(cerr).length})), C=G.reduce((s,g)=>s+g.c,0);
+    if(!C){ out.push("Aún no hay hallazgos cerrados con estos filtros."); return out; }
+    const Gc=G.filter(g=>g.c).sort((a,b)=>b.c-a.c); out.push(`${C} cierres en total. ${Gc[0].nombre} lidera con ${Gc[0].c} (${pc(Gc[0].c,C)} de los cierres).`);
+    out.push(`% de cierre de los hallazgos que levantó cada persona: ${lista(G.slice().sort((a,b)=>b.c/b.n-a.c/a.n||b.n-a.n),g=>`${g.nombre} ${pc(g.c,g.n)}`,6)}.`);
+    const sin=G.filter(g=>!g.c); if(sin.length) out.push(`Sin cierres todavía: ${sin.map(g=>`${g.nombre} (${g.n} abierto${g.n>1?"s":""})`).join(", ")}.`);
+    out.push("Lectura: compara el cierre con lo levantado por cada persona; un % bajo indica hallazgos que necesitan seguimiento.");
+  }
+  if(id==="inspArea"){
+    if(!I.length) return ["Sin inspecciones para los filtros elegidos."];
+    const G=grp(I,x=>x.area,x=>x.area), AREAS=["Planta","Depósito de Relaves","Mina","Proyectos","Izaje"];
+    out.push(`${I.length} inspecciones en ${G.length} área${G.length===1?"":"s"}. Más inspeccionada: ${G[0].nombre} con ${G[0].n} (${pc(G[0].n,I.length)}).`);
+    if(G.length>1) out.push(`Menos inspeccionada: ${G[G.length-1].nombre} con ${G[G.length-1].n}.`);
+    const sin=AREAS.filter(a=>!G.some(g=>g.nombre===a)&&(!D.fa||D.fa===a)); if(sin.length) out.push(`Sin inspecciones en el período: ${sin.join(", ")}.`);
+    const cum=G.map(g=>{ const v=g.L.map(x=>x.pct).filter(p=>p!==null&&p!==""&&!isNaN(p)); return v.length?`${g.nombre} ${Math.round(v.reduce((a,b)=>a+ +b,0)/v.length*100)}%`:null; }).filter(Boolean);
+    if(cum.length) out.push(`% de cumplimiento promedio por área: ${cum.join(" · ")}.`);
+    out.push("Lectura: indica dónde está la presencia de liderazgo en terreno; las áreas con menos inspecciones son prioridad para el calendario de visitas.");
+  }
+  if(id==="hallArea"){
+    const G=grp(H,h=>h.area,h=>h.area);
+    out.push(`${G[0].nombre} concentra más hallazgos: ${G[0].n} (${pc(G[0].n,T)} del total).`);
+    const r=G.map(g=>{ const ni=I.filter(x=>x.area===g.nombre).length; return ni?`${g.nombre} ${(g.n/ni).toFixed(1)}`:null; }).filter(Boolean);
+    if(r.length) out.push(`Hallazgos por inspección: ${r.join(" · ")}.`);
+    const ab=G.map(g=>({...g,a:g.L.filter(h=>!cerr(h)).length,v:g.L.filter(venc).length})).filter(g=>g.a).sort((a,b)=>b.a-a.a);
+    if(ab.length) out.push(`Abiertos por área: ${ab.map(g=>`${g.nombre} ${g.a}${g.v?` (${g.v} vencido${g.v>1?"s":""})`:""}`).join(" · ")}.`);
+    else out.push("No hay hallazgos abiertos en ninguna área.");
+    out.push("Lectura: un mayor número de hallazgos por inspección señala las áreas con más desviaciones al estándar.");
+  }
+  if(id==="sup"){
+    const G=grp(H,h=>normNom(h.lider),h=>h.lider);
+    out.push(`${G.length} supervisor${G.length===1?"":"es"} con hallazgos en sus áreas. Más hallazgos: ${G[0].nombre} con ${G[0].n} (${pc(G[0].n,T)}).`);
+    if(G.length>1) out.push(`Siguen: ${lista(G.slice(1),g=>`${g.nombre} (${g.n})`)}.`);
+    const ab=G.map(g=>({...g,a:g.L.filter(h=>!cerr(h)).length})).filter(g=>g.a).sort((a,b)=>b.a-a.a);
+    if(ab.length) out.push(`Con hallazgos abiertos: ${lista(ab,g=>`${g.nombre} (${g.a})`)}.`);
+    out.push("Lectura: muestra en qué equipos se repiten las desviaciones y dónde reforzar el acompañamiento del supervisor.");
+  }
+  if(id==="top"){
+    const G=grp(H,h=>normNom(h.pregunta),h=>h.pregunta), t3=G.slice(0,3).reduce((s,g)=>s+g.n,0);
+    out.push(`${G.length} desviaciones distintas. La más repetida es "${G[0].nombre}" con ${G[0].n} (${pc(G[0].n,T)}).`);
+    if(G.length>1) out.push(`Le siguen: ${G.slice(1,3).map(g=>`"${g.nombre}" (${g.n})`).join(" y ")}.`);
+    if(G.length>3) out.push(`Las 3 primeras suman ${pc(t3,T)} de los hallazgos.`);
+    out.push("Lectura: las desviaciones que se repiten son el foco para charlas, refuerzo de estándares y controles en terreno.");
+  }
+  return out;
+}
+async function informeDashboardJPG(){
+  if(!ULTDASH) renderDash();
+  const D=ULTDASH, W=1240, M=40, css=getComputedStyle(document.documentElement);
+  const col=c=>{ const m=/^var\((--[\w-]+)\)$/.exec(c); return m?css.getPropertyValue(m[1]).trim():c; };
+  const logo=await new Promise(r=>{ const el=$("header img"); if(!el){ r(null); return; } const im=new Image(); im.onload=()=>r(im); im.onerror=()=>r(null); im.src=el.src; });
+  const F="Arial, Helvetica, sans-serif";
+  const wrap=(ctx,txt,w)=>{ const L=[]; String(txt).split(" ").forEach(p=>{ const l=L.length?L[L.length-1]:null; if(l!==null&&ctx.measureText(l+" "+p).width<=w) L[L.length-1]=l+" "+p; else L.push(p); }); return L; };
+  const dibujar=(ctx)=>{
+    let y=M;
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,99999);
+    let tx=M; if(logo){ const h=46, w=logo.width*h/logo.height; ctx.drawImage(logo,M,y+2,w,h); tx=M+w+22; }
+    ctx.fillStyle="#3F3F3F"; ctx.font=`bold 26px ${F}`; ctx.textAlign="left"; ctx.fillText("Informe explicativo del Dashboard",tx,y+24);
+    ctx.fillStyle="#C76E00"; ctx.font=`bold 15px ${F}`; ctx.fillText("Liderazgo Visible · Plan de Shock · Teck Carmen de Andacollo",tx,y+46);
+    ctx.textAlign="right"; ctx.fillStyle="#5E5E5E"; ctx.font=`13px ${F}`;
+    ctx.fillText(`Generado: ${new Date().toLocaleString("es-CL")}`,W-M,y+14);
+    ctx.fillText(`Área: ${D.fa||"Todas"} · Desde: ${D.fd?fmt(D.fd):"inicio"} · Hasta: ${D.fh?fmt(D.fh):"hoy"}`,W-M,y+32);
+    ctx.textAlign="left"; y+=62; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,W-2*M,5); y+=22;
+    // KPI
+    const cols=5, gap=10, kw=(W-2*M-gap*(cols-1))/cols, kh=70, KC={insp:"#3F3F3F",pend:"#E88305",crit:"#C62828",cerr:"#2E7D32","":"#3F3F3F"};
+    D.KP.forEach(([c,v,l],i)=>{ const x=M+(i%cols)*(kw+gap), yy=y+Math.floor(i/cols)*(kh+gap);
+      ctx.fillStyle="#fff"; ctx.strokeStyle="#D9D9D9"; ctx.lineWidth=1; ctx.strokeRect(x+.5,yy+.5,kw-1,kh-1); ctx.fillStyle=KC[c]||"#3F3F3F"; ctx.fillRect(x,yy,6,kh);
+      ctx.fillStyle=c==="pend"?"#C76E00":(KC[c]||"#3F3F3F"); ctx.font=`bold 28px ${F}`; ctx.fillText(String(v),x+16,yy+34);
+      ctx.fillStyle="#5E5E5E"; ctx.font=`bold 12.5px ${F}`; ctx.fillText(l,x+16,yy+56); });
+    y+=Math.ceil(D.KP.length/cols)*(kh+gap)+8;
+    // resumen
+    const T=D.H.length, C=D.cerr.length;
+    const res=T?`Resumen: se registran ${D.I.length} inspecciones y ${T} hallazgos. Se han cerrado ${C} (${Math.round(C/T*100)}%), quedan ${D.E.p} pendientes en plazo y ${D.E.v} vencidos.${C?` El ${Math.round(D.aTiempo/C*100)}% de los cierres se hizo dentro del plazo.`:""} A continuación se explica cada gráfico del Dashboard.`:"Sin hallazgos para los filtros elegidos.";
+    ctx.font=`16px ${F}`; ctx.fillStyle="#3F3F3F"; wrap(ctx,res,W-2*M).forEach(l=>{ ctx.fillText(l,M,y+16); y+=23; }); y+=8;
+    // gráficos
+    D.GR.forEach(([id,tit,,S,unidad],gi)=>{
+      y+=14; ctx.fillStyle="#E88305"; ctx.fillRect(M,y,6,24); ctx.fillStyle="#3F3F3F"; ctx.font=`bold 19px ${F}`; ctx.fillText(`${gi+1}. ${tit}`,M+14,y+19); y+=36;
+      const y0=y, Sf=S.filter(s=>s.n>0), tot=Sf.reduce((a,s)=>a+s.n,0);
+      ctx.strokeStyle="#D9D9D9"; 
+      // torta
+      const cx=M+95, cy=y0+95, R=85;
+      if(tot){ let a=-Math.PI/2; Sf.forEach(s=>{ const b=a+s.n/tot*2*Math.PI; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a,b); ctx.closePath(); ctx.fillStyle=col(s.color); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); a=b; });
+        ctx.beginPath(); ctx.arc(cx,cy,42,0,2*Math.PI); ctx.fillStyle="#fff"; ctx.fill();
+        ctx.textAlign="center"; ctx.fillStyle="#3F3F3F"; ctx.font=`bold 22px ${F}`; ctx.fillText(String(tot),cx,cy+6); ctx.font=`11px ${F}`; ctx.fillStyle="#5E5E5E"; ctx.fillText(unidad,cx,cy+21); ctx.textAlign="left"; }
+      else { ctx.fillStyle="#7A7A7A"; ctx.font=`14px ${F}`; ctx.fillText("Sin datos",cx-30,cy); }
+      // leyenda
+      let ly=y0+8; const lx=M+200, lw=300;
+      Sf.forEach(s=>{ ctx.fillStyle=col(s.color); ctx.fillRect(lx,ly+2,12,12); ctx.fillStyle="#3F3F3F"; ctx.font=`13px ${F}`;
+        let nm=["hallPer","cierrePer","sup"].includes(id)?nomPropio(s.nombre):s.nombre; const nm0=nm; while(ctx.measureText(nm).width>lw-90&&nm.length>4) nm=nm.slice(0,-2); if(nm!==nm0) nm=nm.trim()+"…";
+        ctx.fillText(nm,lx+18,ly+13); ctx.textAlign="right"; ctx.font=`bold 13px ${F}`; ctx.fillText(String(s.n),lx+lw-42,ly+13); ctx.font=`12px ${F}`; ctx.fillStyle="#7A7A7A"; ctx.fillText(Math.round(s.n/tot*100)+"%",lx+lw,ly+13); ctx.textAlign="left"; ly+=21; });
+      // explicación
+      const ex=lx+lw+30, ew=W-M-ex; let ey=y0+4;
+      ctx.fillStyle="#FDF1E2"; 
+      const P=textosGrafico(id,D); ctx.font=`14.5px ${F}`;
+      const bloques=P.map(t=>{ const lec=t.startsWith("Lectura:"); return {lec,L:wrap(ctx,t,ew-30)}; });
+      const alto=bloques.reduce((s,b)=>s+b.L.length*20+8,0)+16;
+      ctx.fillStyle="#FAFAFA"; ctx.fillRect(ex-12,y0-4,ew+12,alto); ctx.fillStyle="#E88305"; ctx.fillRect(ex-12,y0-4,3,alto);
+      bloques.forEach(b=>{ ctx.fillStyle=b.lec?"#1565C0":"#E88305"; ctx.beginPath(); ctx.arc(ex+4,ey+14,3.5,0,2*Math.PI); ctx.fill();
+        ctx.fillStyle=b.lec?"#1565C0":"#3F3F3F"; ctx.font=(b.lec?"italic ":"")+`14.5px ${F}`; b.L.forEach(l=>{ ctx.fillText(l,ex+16,ey+19); ey+=20; }); ey+=8; });
+      y=Math.max(y0+195,ly+6,y0+alto)+10;
+      ctx.fillStyle="#E3E3E3"; ctx.fillRect(M,y,W-2*M,1); y+=4;
+    });
+    y+=12; ctx.fillStyle="#7A7A7A"; ctx.font=`12px ${F}`;
+    wrap(ctx,"Vencido = pendiente con plazo anterior a hoy. Los textos se generan automáticamente con los datos del Dashboard y los filtros aplicados al momento de generar el informe. Fuente: app Liderazgo Visible (datos de todos los equipos).",W-2*M).forEach(l=>{ ctx.fillText(l,M,y+12); y+=17; });
+    return y+M;
+  };
+  const sc=2, med=document.createElement("canvas"); med.width=W; med.height=10;
+  const mctx=med.getContext("2d"); const alto=Math.ceil(dibujar(Object.assign(mctx,{}))); 
+  const cv=document.createElement("canvas"); cv.width=W*sc; cv.height=alto*sc; const ctx=cv.getContext("2d"); ctx.scale(sc,sc); dibujar(ctx);
+  const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",.9)); const nombre=`Informe_Dashboard_${hoy()}.jpg`;
+  const file=new File([blob],nombre,{type:"image/jpeg"});
+  if(matchMedia("(pointer:coarse)").matches && navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:"Informe explicativo del Dashboard"}); return "compartido"; }catch(e){ if(e.name==="AbortError") return "cancelado"; }
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  return "descargado";
+}
+$("#dbInforme").onclick=async()=>{ const b=$("#dbInforme"); b.disabled=true; toast("Generando informe…");
+  try{ const r=await informeDashboardJPG(); if(r==="descargado") toast("Informe JPG descargado."); }catch(e){ toast("No se pudo generar el informe: "+e.message); } finally{ b.disabled=false; } };
 $("#dbExcel").onclick=()=>{ try{ excelDashboard(); toast("Excel descargado."); }catch(e){ toast("No se pudo generar el Excel: "+e.message); } };
 ["#dbArea","#dbDesde","#dbHasta"].forEach(s=>$(s).addEventListener("input", renderDash));
 $("#dbActualizar").onclick=async()=>{ await traerHallazgos(); renderDash(); toast("Datos actualizados."); };
